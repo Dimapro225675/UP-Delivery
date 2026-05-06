@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% block title %}Заказ #{{ object.pk }}{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h3>Заказ #{{ object.pk }}</h3>
+                <span class="badge fs-6 bg-{% if object.status == 'delivered' %}success{% elif object.status == 'in_progress' %}warning{% elif object.status == 'cancelled' %}danger{% else %}secondary{% endif %}">
+                    {{ object.get_status_display }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-user me-2"></i>Клиент</h6>
+                        <p>{{ object.client.username }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-user{% if object.courier %} text-success{% endif %} me-2"></i>Курьер</h6>
+                        <p>{% if object.courier %}{{ object.courier.username }}{% else %}Не назначен{% endif %}</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-map-marker-alt me-2 text-primary"></i>Откуда</h6>
+                        <p>{{ object.pickup_address }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-map-marker-alt me-2 text-success"></i>Куда</h6>
+                        <p>{{ object.delivery_address }}</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-shipping-fast me-2"></i>Тип доставки</h6>
+                        <p>{{ object.delivery_type.name }} ({{ object.delivery_type.max_distance }}км)</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="fas fa-calendar me-2"></i>Создан</h6>
+                        <p>{{ object.created_at|date:"d.m.Y H:i" }}</p>
+                    </div>
+                </div>
+                {% if object.description %}
+                <hr>
+                <h6><i class="fas fa-comment me-2"></i>Описание</h6>
+                <p>{{ object.description }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-cog me-2"></i>Действия</h6>
+            </div>
+            <div class="card-body">
+                <a href="{% url 'Order:order_update' object.pk %}" class="btn btn-outline-warning btn-sm w-100 mb-2">
+                    <i class="fas fa-edit me-2"></i>Редактировать
+                </a>
+                <a href="{% url 'Order:order_delete' object.pk %}" class="btn btn-outline-danger btn-sm w-100 mb-2">
+                    <i class="fas fa-trash me-2"></i>Удалить
+                </a>
+                <a href="{% url 'Order:payment_create' object.pk %}" class="btn btn-outline-success btn-sm w-100 mb-2">
+                    <i class="fas fa-credit-card me-2"></i>Добавить платеж
+                </a>
+                <a href="#" class="btn btn-outline-info btn-sm w-100" data-bs-toggle="modal" data-bs-target="#statusModal">
+                    <i class="fas fa-sync me-2"></i>Обновить статус
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-history me-2"></i>История статусов</h6>
+            </div>
+            <div class="card-body">
+                {% for history in status_history %}
+                <div class="d-flex align-items-start mb-2 p-2 bg-light rounded">
+                    <i class="fas fa-circle text-{% if history.status == 'delivered' %}success{% elif history.status == 'in_progress' %}warning{% else %}secondary{% endif %} fs-6 mt-1 me-2 flex-shrink-0"></i>
+                    <div>
+                        <small class="text-muted">{{ history.timestamp|date:"d.m H:i" }}</small>
+                        <div><strong>{{ history.get_status_display }}</strong></div>
+                        {% if history.courier %}<small>Курьер: {{ history.courier.username }}</small>{% endif %}
+                        {% if history.comment %}<div class="text-muted">{{ history.comment }}</div>{% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-muted text-center">История пуста</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Обновить статус заказа #{{ object.pk }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="statusForm">
+                    <div class="mb-3">
+                        <label class="form-label">Статус</label>
+                        <select name="status" class="form-select" required>
+                            <option value="">Выберите статус</option>
+                            <option value="picked_up">Забран</option>
+                            <option value="in_transit">В пути</option>
+                            <option value="delivered">Доставлен</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Комментарий</label>
+                        <textarea name="comment" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Местоположение</label>
+                        <input type="text" name="location" class="form-control" placeholder="Текущее место">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="updateStatus({{ object.pk }})">Обновить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function updateStatus(orderId) {
+    const form = document.getElementById('statusForm');
+    const formData = new FormData(form);
+    fetch(`/orders/add-status/${orderId}/`, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Ошибка обновления статуса');
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

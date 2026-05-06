@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Удалить заказ #{{ object.pk }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4><i class="fas fa-exclamation-triangle me-2"></i>Удалить заказ</h4>
+            </div>
+            <div class="card-body text-center">
+                <h5>Заказ #{{ object.pk }}</h5>
+                <p class="lead mb-4">{{ object.delivery_address|truncatechars:50 }}</p>
+                <p class="text-muted">Эта операция необратима</p>
+                <form method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>Удалить
+                    </button>
+                </form>
+                <a href="{{ object.get_absolute_url }}" class="btn btn-secondary ms-2">
+                    Отмена
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

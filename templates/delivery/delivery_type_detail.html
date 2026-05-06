@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}{{ object.name }}{% endblock %}
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h2>{{ object.name }}</h2>
+        <p class="lead">{{ object.description }}</p>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="fas fa-route me-2"></i>Макс. расстояние</h6>
+                        <h4>{{ object.max_distance }} км</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-success text-white">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="fas fa-ruble-sign me-2"></i>Базовая цена</h6>
+                        <h4>{{ object.base_price }} ₽</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
