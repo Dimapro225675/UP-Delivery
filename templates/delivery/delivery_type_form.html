@@ -1,43 +1,28 @@
 {% extends 'base.html' %}
-{% block title %}{% if form.instance.pk %}Редактировать{% else %}Создать{% endif %} тип доставки{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3>{% if form.instance.pk %}Редактировать{% else %}Создать{% endif %} тип доставки</h3>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            {{ form.name.label_tag }}
-                            {{ form.name|add_class:"form-control" }}
-                            {% if form.name.errors %}{{ form.name.errors }}{% endif %}
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            {{ form.max_distance.label_tag }}
-                            {{ form.max_distance|add_class:"form-control" }}
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        {{ form.description.label_tag }}
-                        {{ form.description|add_class:"form-control" }}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.base_price.label_tag }}
-                        {{ form.base_price|add_class:"form-control" }}
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>Сохранить
-                    </button>
-                    <a href="{% url 'delivery_type_list' %}" class="btn btn-secondary">
-                        Отмена
-                    </a>
-                </form>
-            </div>
-        </div>
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Форма</div>
+    <h1 class="hero-title">{% if object %}Редактирование{% else %}Создание{% endif %} типа доставки</h1>
+  </div>
+</div>
+
+<div class="glass-card mx-auto form-shell">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-primary btn-lg rounded-pill px-4">Сохранить</button>
+      <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
     </div>
+  </form>
 </div>
 {% endblock %}

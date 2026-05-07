@@ -1,12 +1,20 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.views.generic import (ListView, DetailView, CreateView, UpdateView, DeleteView)
+from django.shortcuts import get_object_or_404
+from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q
+
 from .models import Order, Payment, StatusHistory, Issue, DeliveryType
+from .forms import (
+    DeliveryTypeForm,
+    OrderForm,
+    PaymentForm,
+    IssueForm,
+    IssueResolveForm,
+)
 
 
 class DeliveryTypeListView(ListView):
@@ -22,31 +30,30 @@ class DeliveryTypeDetailView(DetailView):
 
 class DeliveryTypeCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = DeliveryType
-    fields = ['name', 'description', 'max_distance', 'base_price']
+    form_class = DeliveryTypeForm
     template_name = 'delivery/delivery_type_form.html'
-    success_url = reverse_lazy('delivery_type_list')
+    success_url = reverse_lazy('Order:delivery_type_list')
     success_message = 'Тип доставки успешно создан'
 
 
 class DeliveryTypeUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = DeliveryType
-    fields = ['name', 'description', 'max_distance', 'base_price']
+    form_class = DeliveryTypeForm
     template_name = 'delivery/delivery_type_form.html'
-    success_url = reverse_lazy('delivery_type_list')
+    success_url = reverse_lazy('Order:delivery_type_list')
     success_message = 'Тип доставки успешно обновлен'
 
 
-class DeliveryTypeDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
+class DeliveryTypeDeleteView(LoginRequiredMixin, DeleteView):
     model = DeliveryType
     template_name = 'delivery/delivery_type_confirm_delete.html'
-    success_url = reverse_lazy('delivery_type_list')
-    success_message = 'Тип доставки удален'
+    success_url = reverse_lazy('Order:delivery_type_list')
 
 
 class OrderListView(ListView):
     model = Order
     template_name = 'orders/order_list.html'
-    context_object_name = 'orders'
+    context_object_name = 'Order'
     paginate_by = 20
 
     def get_queryset(self):
@@ -77,9 +84,9 @@ class OrderDetailView(DetailView):
 
 class OrderCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Order
-    fields = ['pickup_address', 'delivery_address', 'description', 'delivery_type']
+    form_class = OrderForm
     template_name = 'orders/order_form.html'
-    success_url = reverse_lazy('order_list')
+    success_url = reverse_lazy('orders:order_list')
     success_message = 'Заказ успешно создан'
 
     def form_valid(self, form):
@@ -89,16 +96,16 @@ class OrderCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
 
 class OrderUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = Order
-    fields = ['pickup_address', 'delivery_address', 'description', 'delivery_type', 'status', 'courier']
+    form_class = OrderForm
     template_name = 'orders/order_form.html'
-    success_url = reverse_lazy('order_list')
+    success_url = reverse_lazy('Order:order_list')
     success_message = 'Заказ успешно обновлен'
 
 
 class OrderDeleteView(LoginRequiredMixin, DeleteView):
     model = Order
     template_name = 'orders/order_confirm_delete.html'
-    success_url = reverse_lazy('order_list')
+    success_url = reverse_lazy('Order:order_list')
 
 
 class PaymentListView(ListView):
@@ -115,9 +122,9 @@ class PaymentDetailView(DetailView):
 
 class PaymentCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Payment
-    fields = ['amount', 'payment_method', 'status', 'transaction_id']
+    form_class = PaymentForm
     template_name = 'payments/payment_form.html'
-    success_url = reverse_lazy('payment_list')
+    success_url = reverse_lazy('Order:payment_list')
     success_message = 'Платеж успешно создан'
 
     def form_valid(self, form):
@@ -128,9 +135,9 @@ class PaymentCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
 
 class PaymentUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = Payment
-    fields = ['amount', 'payment_method', 'status', 'transaction_id']
+    form_class = PaymentForm
     template_name = 'payments/payment_form.html'
-    success_url = reverse_lazy('payment_list')
+    success_url = reverse_lazy('Order:payment_list')
     success_message = 'Платеж обновлен'
 
 
@@ -160,6 +167,7 @@ def add_status_history(request, order_id):
 
         messages.success(request, 'Статус обновлен')
         return JsonResponse({'success': True})
+
     return JsonResponse({'success': False})
 
 
@@ -167,13 +175,14 @@ class IssueListView(ListView):
     model = Issue
     template_name = 'issues/issue_list.html'
     context_object_name = 'issues'
+    paginate_by = 20
 
 
 class IssueCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Issue
-    fields = ['issue_type', 'description']
+    form_class = IssueForm
     template_name = 'issues/issue_form.html'
-    success_url = reverse_lazy('issue_list')
+    success_url = reverse_lazy('Order:issue_list')
     success_message = 'Проблема зарегистрирована'
 
     def form_valid(self, form):
@@ -185,7 +194,7 @@ class IssueCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
 
 class IssueUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = Issue
-    fields = ['resolved']
+    form_class = IssueResolveForm
     template_name = 'issues/issue_resolve_form.html'
-    success_url = reverse_lazy('issue_list')
+    success_url = reverse_lazy('Order:issue_list')
     success_message = 'Проблема обновлена'

@@ -1,45 +1,26 @@
 {% extends 'base.html' %}
-{% block title %}{% if object %}Редактировать{% else %}Создать{% endif %} платеж{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h3>{% if object %}Редактировать{% else %}Создать{% endif %} платеж для заказа #{{ view.kwargs.order_id }}</h3>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            {{ form.amount.label_tag }}
-                            {{ form.amount|add_class:"form-control" }}
-                            <div class="form-text">Сумма в рублях</div>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            {{ form.payment_method.label_tag }}
-                            {{ form.payment_method|add_class:"form-select" }}
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            {{ form.status.label_tag }}
-                            {{ form.status|add_class:"form-select" }}
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            {{ form.transaction_id.label_tag }}
-                            {{ form.transaction_id|add_class:"form-control" }}
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>{% if object %}Сохранить{% else %}Создать{% endif %}
-                    </button>
-                    <a href="{% url 'delivery:payment_list' %}" class="btn btn-secondary">
-                        Отмена
-                    </a>
-                </form>
-            </div>
-        </div>
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Форма</div>
+    <h1 class="hero-title">{% if object %}Редактирование платежа{% else %}Создание платежа{% endif %}</h1>
+  </div>
+</div>
+
+<div class="glass-card mx-auto form-shell">
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-primary btn-lg rounded-pill px-4">Сохранить</button>
+      <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
     </div>
+  </form>
 </div>
 {% endblock %}

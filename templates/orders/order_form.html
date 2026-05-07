@@ -1,57 +1,28 @@
 {% extends 'base.html' %}
-{% block title %}{% if object %}Редактировать{% else %}Создать{% endif %} заказ{% endblock %}
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-10">
-        <div class="card">
-            <div class="card-header">
-                <h3>{% if object %}Редактировать{% else %}Создать{% endif %} заказ</h3>
-            </div>
-            <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            {{ form.pickup_address.label_tag }}
-                            {{ form.pickup_address|add_class:"form-control" }}
-                            {% if form.pickup_address.errors %}{{ form.pickup_address.errors }}{% endif %}
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            {{ form.delivery_address.label_tag }}
-                            {{ form.delivery_address|add_class:"form-control" }}
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            {{ form.delivery_type.label_tag }}
-                            {{ form.delivery_type|add_class:"form-select" }}
-                        </div>
-                        {% if form.status %}
-                        <div class="col-md-6 mb-3">
-                            {{ form.status.label_tag }}
-                            {{ form.status|add_class:"form-select" }}
-                        </div>
-                        {% endif %}
-                        {% if form.courier %}
-                        <div class="col-md-6 mb-3">
-                            {{ form.courier.label_tag }}
-                            {{ form.courier|add_class:"form-select" }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div class="mb-3">
-                        {{ form.description.label_tag }}
-                        {{ form.description|add_class:"form-control" }}
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save me-2"></i>{% if object %}Сохранить{% else %}Создать{% endif %}
-                    </button>
-                    <a href="{% url 'order_list' %}" class="btn btn-secondary">
-                        Отмена
-                    </a>
-                </form>
-            </div>
-        </div>
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Форма</div>
+    <h1 class="hero-title">{% if object %}Редактирование заказа{% else %}Создание заказа{% endif %}</h1>
+  </div>
+</div>
+
+<div class="glass-card mx-auto form-shell">
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-primary btn-lg rounded-pill px-4">Сохранить</button>
+      <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
     </div>
+  </form>
 </div>
 {% endblock %}

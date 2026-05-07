@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from decimal import Decimal
 
 
-
 class DeliveryType(models.Model):
     name = models.CharField(max_length=100, verbose_name="Название")
     description = models.TextField(blank=True, verbose_name="Описание")

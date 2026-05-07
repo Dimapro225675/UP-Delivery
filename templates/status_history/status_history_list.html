@@ -1,58 +1,43 @@
 {% extends 'base.html' %}
 {% block title %}История статусов{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-history me-2"></i>История статусов</h2>
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Трекинг</div>
+    <h1 class="hero-title">История статусов</h1>
+    <p class="hero-subtitle">Все изменения по заказам в одном месте.</p>
+  </div>
 </div>
 
-<div class="table-responsive">
-    <table class="table table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>Заказ</th>
-                <th>Статус</th>
-                <th>Курьер</th>
-                <th>Местоположение</th>
-                <th>Комментарий</th>
-                <th>Время</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for history in history %}
-            <tr>
-                <td>
-                    <a href="{{ history.order.get_absolute_url }}" class="text-decoration-none">
-                        #{{ history.order.pk }}
-                    </a>
-                </td>
-                <td>
-                    <span class="badge bg-{% if history.status == 'delivered' %}success{% elif history.status == 'in_progress' or history.status == 'picked_up' %}warning{% elif history.status == 'cancelled' %}danger{% else %}secondary{% endif %}">
-                        {{ history.get_status_display }}
-                    </span>
-                </td>
-                <td>{{ history.courier.username|default:"—" }}</td>
-                <td>{{ history.location|default:"—" }}</td>
-                <td>{{ history.comment|truncatechars:50|default:"—" }}</td>
-                <td>{{ history.timestamp|date:"d.m.Y H:i" }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" class="text-center py-4">История пуста</td></tr>
-            {% endfor %}
-        </tbody>
+<div class="glass-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Время</th>
+          <th>Заказ</th>
+          <th>Статус</th>
+          <th>Курьер</th>
+          <th>Локация</th>
+          <th>Комментарий</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in history %}
+        <tr>
+          <td>{{ item.timestamp|date:"d.m.Y H:i" }}</td>
+          <td><a href="{% url 'Order:order_detail' item.order.pk %}">#{{ item.order.pk }}</a></td>
+          <td><span class="status-badge status-{{ item.status }}">{{ item.get_status_display }}</span></td>
+          <td>{% if item.courier %}{{ item.courier.username }}{% else %}—{% endif %}</td>
+          <td>{{ item.location|default:"—" }}</td>
+          <td>{{ item.comment|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted">История пустая.</td></tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
 </div>
-
-{% if page_obj.has_other_pages %}
-<nav aria-label="Пагинация">
-    <ul class="pagination justify-content-center">
-        {% if page_obj.has_previous %}
-            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Назад</a></li>
-        {% endif %}
-        <li class="page-item active"><span class="page-link">Страница {{ page_obj.number }}</span></li>
-        {% if page_obj.has_next %}
-            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Вперед</a></li>
-        {% endif %}
-    </ul>
-</nav>
-{% endif %}
 {% endblock %}

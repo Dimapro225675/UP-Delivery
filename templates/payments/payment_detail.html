@@ -1,49 +1,19 @@
 {% extends 'base.html' %}
-{% block title %}Платеж #{{ object.pk }}{% endblock %}
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between">
-                <h3>Платеж #{{ object.pk }}</h3>
-                <span class="badge fs-6 bg-{% if object.status == 'paid' %}success{% elif object.status == 'pending' %}warning{% else %}danger{% endif %}">
-                    {{ object.get_status_display }}
-                </span>
-            </div>
-            <div class="card-body">
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-box me-2"></i>Заказ</h6>
-                        <p>
-                            <a href="{% url 'Order:payment_update' payment.pk %}">
-                        </p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-calendar me-2"></i>Дата оплаты</h6>
-                        <p>{{ object.paid_at|date:"d.m.Y H:i"|default:"Не оплачен" }}</p>
-                    </div>
-                </div>
-                
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card bg-light">
-                            <div class="card-body text-center">
-                                <h1 class="display-4 text-success">{{ object.amount }} ₽</h1>
-                                <p class="mb-0"><strong>Сумма платежа</strong></p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h6><i class="fas fa-credit-card me-2"></i>Способ оплаты</h6>
-                        <p class="fs-5">{{ object.payment_method|title }}</p>
-                        {% if object.transaction_id %}
-                        <h6><i class="fas fa-hashtag me-2"></i>ID транзакции</h6>
-                        <code class="bg-light p-2 d-block">{{ object.transaction_id }}</code>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Платеж #{{ object.pk }}</div>
+    <h1 class="hero-title">{{ object.amount }} ₽</h1>
+    <p class="hero-subtitle">Заказ #{{ object.order.pk }}</p>
+  </div>
+  <a href="{% url 'Order:payment_update' object.pk %}" class="btn btn-outline-primary btn-lg rounded-pill">Редактировать</a>
+</div>
+
+<div class="glass-card">
+  <div class="row g-4">
+    <div class="col-md-4"><div class="stat-box"><span>Способ</span><strong>{{ object.payment_method }}</strong></div></div>
+    <div class="col-md-4"><div class="stat-box"><span>Статус</span><strong>{{ object.get_status_display }}</strong></div></div>
+    <div class="col-md-4"><div class="stat-box"><span>Транзакция</span><strong>{{ object.transaction_id|default:"—" }}</strong></div></div>
+  </div>
 </div>
 {% endblock %}

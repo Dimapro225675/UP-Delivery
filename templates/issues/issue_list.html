@@ -1,44 +1,49 @@
 {% extends 'base.html' %}
 {% block title %}Проблемы{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="fas fa-exclamation-triangle me-2"></i>Проблемы и жалобы</h2>
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Контроль качества</div>
+    <h1 class="hero-title">Проблемы</h1>
+    <p class="hero-subtitle">Задержки, повреждения, ошибки адреса и оплаты.</p>
+  </div>
 </div>
 
-<div class="table-responsive">
-    <table class="table table-hover">
-        <thead class="table-dark">
-            <tr>
-                <th>ID</th>
-                <th>Заказ</th>
-                <th>Тип проблемы</th>
-                <th>Статус</th>
-                <th>Автор</th>
-                <th>Дата</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for issue in issues %}
-            <tr class="{% if not issue.resolved %}table-danger{% else %}table-success{% endif %}">
-                <td><strong>#{{ issue.pk }}</strong></td>
-                <td>
-                    <a href="{{ issue.order.get_absolute_url }}" class="text-decoration-none">
-                        Заказ #{{ issue.order.pk }}
-                    </a>
-                </td>
-                <td>{{ issue.get_issue_type_display }}</td>
-                <td>
-                    <span class="badge bg-{% if issue.resolved %}success{% else %}danger{% endif %}">
-                        {% if issue.resolved %}Решена{% else %}Открыта{% endif %}
-                    </span>
-                </td>
-                <td>{{ issue.created_by.username|default:"—" }}</td>
-                <td>{{ issue.created_at|date:"d.m.Y H:i"|default:"—" }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="6" class="text-center py-4">Нет проблем</td></tr>
-            {% endfor %}
-        </tbody>
+<div class="glass-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Заказ</th>
+          <th>Тип</th>
+          <th>Описание</th>
+          <th>Создал</th>
+          <th>Решена</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in issues %}
+        <tr>
+          <td>#{{ issue.pk }}</td>
+          <td><a href="{% url 'Order:order_detail' issue.order.pk %}">#{{ issue.order.pk }}</a></td>
+          <td>{{ issue.get_issue_type_display }}</td>
+          <td>{{ issue.description|truncatechars:80 }}</td>
+          <td>{% if issue.created_by %}{{ issue.created_by.username }}{% else %}—{% endif %}</td>
+          <td>
+            {% if issue.resolved %}
+              <span class="status-badge status-delivered">Да</span>
+            {% else %}
+              <span class="status-badge status-new">Нет</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted">Проблем нет.</td></tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
 </div>
 {% endblock %}
