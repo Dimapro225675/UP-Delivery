@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from decimal import Decimal
 
 
@@ -33,13 +33,13 @@ class Order(models.Model):
     ]
 
     client = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='client_orders',
         verbose_name="Клиент"
     )
     courier = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='courier_orders',
@@ -121,7 +121,7 @@ class StatusHistory(models.Model):
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES)
     courier = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         verbose_name="Курьер"
@@ -157,7 +157,7 @@ class Issue(models.Model):
     issue_type = models.CharField(max_length=20, choices=ISSUE_TYPES)
     description = models.TextField(verbose_name="Описание")
     created_by = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Создал"
