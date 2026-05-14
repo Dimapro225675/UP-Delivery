@@ -6,6 +6,9 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.http import JsonResponse
 from django.db.models import Q
+from django.shortcuts import redirect
+from django.shortcuts import render
+from django.db.models import Sum
 
 from .models import Order, Payment, StatusHistory, Issue, DeliveryType
 from .forms import (
@@ -166,9 +169,9 @@ def add_status_history(request, order_id):
         order.save()
 
         messages.success(request, 'Статус обновлен')
-        return JsonResponse({'success': True})
+        return redirect('Order:order_detail', pk=order.pk)
 
-    return JsonResponse({'success': False})
+    return redirect('Order:order_detail', pk=order_id)
 
 
 class IssueListView(ListView):
@@ -198,3 +201,41 @@ class IssueUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     template_name = 'issues/issue_resolve_form.html'
     success_url = reverse_lazy('Order:issue_list')
     success_message = 'Проблема обновлена'
+
+def home(request):
+
+    total_orders = Order.objects.count()
+
+    active_orders = Order.objects.filter(
+        status__in=['new', 'assigned', 'in_progress']
+    ).count()
+
+    delivered_orders = Order.objects.filter(
+        status='delivered'
+    ).count()
+
+    issues_count = Issue.objects.filter(
+        resolved=False
+    ).count()
+
+    total_revenue = Payment.objects.filter(
+        status='paid'
+    ).aggregate(
+        total=Sum('amount')
+    )['total'] or 0
+
+    latest_orders = Order.objects.select_related(
+        'client',
+        'delivery_type'
+    ).order_by('-created_at')[:5]
+
+    context = {
+        'total_orders': total_orders,
+        'active_orders': active_orders,
+        'delivered_orders': delivered_orders,
+        'issues_count': issues_count,
+        'total_revenue': total_revenue,
+        'latest_orders': latest_orders,
+    }
+
+    return render(request, 'home.html', context)
