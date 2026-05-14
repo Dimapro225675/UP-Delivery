@@ -53,7 +53,7 @@ class DeliveryTypeDeleteView(LoginRequiredMixin, DeleteView):
 class OrderListView(ListView):
     model = Order
     template_name = 'orders/order_list.html'
-    context_object_name = 'Order'
+    context_object_name = 'orders'
     paginate_by = 20
 
     def get_queryset(self):
@@ -86,7 +86,7 @@ class OrderCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Order
     form_class = OrderForm
     template_name = 'orders/order_form.html'
-    success_url = reverse_lazy('orders:order_list')
+    success_url = reverse_lazy('Order:order_list')
     success_message = 'Заказ успешно создан'
 
     def form_valid(self, form):

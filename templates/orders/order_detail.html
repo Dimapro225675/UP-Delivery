@@ -112,7 +112,7 @@
 
     <div class="glass-card">
       <h4 class="section-title">Быстрый статус</h4>
-      <form method="post" action="{% url 'Order:add_status_history' object.pk %}">
+      <form method="post" action="{% url 'Order:add_status' object.pk %}">
         {% csrf_token %}
         <select name="status" class="form-select mb-2">
           <option value="assigned">Назначен курьеру</option>
