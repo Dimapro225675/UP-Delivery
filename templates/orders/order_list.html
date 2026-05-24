@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Заказы{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Управление доставкой</div>
+    <h1 class="hero-title">Заказы</h1>
+    <p class="hero-subtitle">Поиск по трекинг-номеру, фильтры, статусы и контроль отправлений.</p>
+  </div>
+  <a href="{% url 'Order:order_create' %}" class="btn btn-primary btn-lg rounded-pill px-4">+ Новый заказ</a>
+</div>
+
+<div class="filter-panel p-4 mb-4">
+  <form method="get" class="row g-3 align-items-end">
+    <div class="col-md-6">
+      <label class="form-label">Поиск</label>
+      <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-lg" placeholder="Трек-номер, адрес забора или доставки">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Статус</label>
+      <select name="status" class="form-select form-select-lg">
+        <option value="">Все статусы</option>
+        {% for value,label in status_choices %}
+          <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-dark w-100 btn-lg">Фильтр</button>
+    </div>
+  </form>
+</div>
+
+<div class="grid-cards">
+  {% for order in orders %}
+  <a href="{% url 'Order:order_detail' order.pk %}" class="order-card">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <div class="card-kicker">{{ order.tracking_number }}</div>
+        <h3 class="card-title">{{ order.delivery_type.name }}</h3>
+      </div>
+      <span class="status-badge status-{{ order.status }}">{{ order.get_status_display }}</span>
+    </div>
+
+    <div class="route-block">
+      <div class="route-item">
+        <span class="route-label">Откуда</span>
+        <span class="route-value">{{ order.pickup_address|truncatechars:70 }}</span>
+      </div>
+      <div class="route-line"></div>
+      <div class="route-item">
+        <span class="route-label">Куда</span>
+        <span class="route-value">{{ order.delivery_address|truncatechars:70 }}</span>
+      </div>
+    </div>
+
+    <div class="meta-row mt-3">
+      <span>Клиент: {{ order.client.username }}</span>
+      {% if order.courier %}<span>Курьер: {{ order.courier.username }}</span>{% endif %}
+    </div>
+    <div class="meta-row mt-2">
+      <span>{{ order.created_at|date:"d.m.Y H:i" }}</span>
+      <span>{{ order.delivery_price }} ₽</span>
+    </div>
+  </a>
+  {% empty %}
+    <div class="empty-state p-4">
+      <h3>Заказы не найдены</h3>
+      <p>Создайте первый заказ или измените фильтры.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

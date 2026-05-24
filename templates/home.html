@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Главная{% endblock %}
+
+{% block content %}
+<div class="hero-home">
+  <div class="hero-home__content">
+    <div class="eyebrow">Сервис доставки</div>
+    <h1 class="hero-title">Отправляйте, отслеживайте и оплачивайте заказы онлайн</h1>
+    <p class="hero-subtitle">
+      Быстрый заказ доставки, удобный трекинг по накладной и онлайн-оплата без лишних действий.
+    </p>
+
+    <div class="hero-actions">
+      <a href="{% url 'Order:order_create' %}" class="btn btn-primary btn-lg rounded-pill px-4">
+        Создать заказ
+      </a>
+      <a href="{% url 'Order:public_tracking' %}" class="btn btn-outline-primary btn-lg rounded-pill px-4">
+        Отследить заказ
+      </a>
+    </div>
+  </div>
+
+  <div class="hero-home__panel">
+    <div class="feature-card">
+      <div class="feature-icon">1</div>
+      <h3>Создание заявки</h3>
+      <p>Заполните адреса, тип доставки и комментарий в пару кликов.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">2</div>
+      <h3>Отслеживание статуса</h3>
+      <p>Проверяйте движение заказа и историю изменений в реальном времени.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">3</div>
+      <h3>Личный кабинет</h3>
+      <p>Смотрите активные заказы, проблемы и завершенную историю доставок.</p>
+    </div>
+  </div>
+</div>
+
+<div class="stats-strip mt-5">
+  <div class="stat-box">
+    <span>Быстро</span>
+    <strong>Оформление за минуту</strong>
+  </div>
+  <div class="stat-box">
+    <span>Прозрачно</span>
+    <strong>Статусы и история</strong>
+  </div>
+  <div class="stat-box">
+    <span>Удобно</span>
+    <strong>Личный кабинет</strong>
+  </div>
+</div>
+{% endblock %}

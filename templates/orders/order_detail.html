@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}{{ object.tracking_number }}{% endblock %}
+
+{% block content %}
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Отправление {{ object.tracking_number }}</div>
+    <h1 class="hero-title">{{ object.get_status_display }}</h1>
+    <p class="hero-subtitle">{{ object.delivery_type.name }} · {{ object.delivery_price }} ₽</p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if object.status == 'waiting' or can_manage %}
+      <a href="{% url 'Order:order_update' object.pk %}" class="btn btn-outline-primary btn-lg rounded-pill">Редактировать</a>
+    {% endif %}
+    {% if object.status == 'waiting' %}
+      <a href="{% url 'Order:order_delete' object.pk %}" class="btn btn-outline-danger btn-lg rounded-pill">Отменить</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="glass-card mb-4">
+      <h4 class="section-title">Маршрут</h4>
+      <div class="route-vertical">
+        <div><span class="route-label">Адрес забора</span><p class="mb-0">{{ object.pickup_address }}</p></div>
+        <div><span class="route-label">Адрес доставки</span><p class="mb-0">{{ object.delivery_address }}</p></div>
+      </div>
+    </div>
+
+    <div class="glass-card mb-4">
+      <h4 class="section-title">Параметры заказа</h4>
+      <div class="info-list">
+        <div><span>Вес</span><strong>{{ object.weight_kg }} кг</strong></div>
+        <div><span>Габариты</span><strong>{{ object.length_cm }} x {{ object.width_cm }} x {{ object.height_cm }} см</strong></div>
+        <div><span>Тип доставки</span><strong>{% if object.delivery_to_pickup_point %}Пункт выдачи{% else %}По адресу{% endif %}</strong></div>
+        <div><span>Расстояние между городами</span><strong>{{ object.distance_km }} км</strong></div>
+        <div><span>Фотография</span><strong>{% if object.order_photo %}<a href="{{ object.order_photo.url }}">Открыть</a>{% else %}-{% endif %}</strong></div>
+        {% if object.description %}<div><span>Комментарий</span><strong>{{ object.description }}</strong></div>{% endif %}
+        {% if object.delivery_report_photo %}<div><span>Фотоотчет</span><strong><a href="{{ object.delivery_report_photo.url }}">Открыть</a></strong></div>{% endif %}
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <h4 class="section-title">История заказа</h4>
+      {% for item in status_history %}
+        <div class="timeline-item mb-3">
+          <div class="d-flex justify-content-between">
+            <strong>{{ item.get_status_display }}</strong>
+            <span class="text-muted">{{ item.timestamp|date:"d.m.Y H:i" }}</span>
+          </div>
+          <div class="text-muted small">{% if item.courier %}{{ item.courier }}{% endif %}</div>
+          {% if item.comment %}<p class="mb-0 mt-1">{{ item.comment }}</p>{% endif %}
+        </div>
+      {% empty %}
+        <p class="text-muted mb-0">История пока пуста.</p>
+      {% endfor %}
+    </div>
+
+    <div class="glass-card mt-4">
+      <h4 class="section-title">Проблемы с заказом</h4>
+      {% for issue in issues %}
+        <div class="timeline-item mb-3">
+          <div class="d-flex justify-content-between">
+            <strong>{{ issue.get_issue_type_display }}</strong>
+            <span class="text-muted">{{ issue.created_at|date:"d.m.Y H:i" }}</span>
+          </div>
+          <p class="mb-0 mt-1">{{ issue.description }}</p>
+        </div>
+      {% empty %}
+        <p class="text-muted mb-0">Проблемы отсутствуют.</p>
+      {% endfor %}
+      {% if can_manage %}
+        <a href="{% url 'Order:issue_create' object.pk %}" class="btn btn-outline-primary rounded-pill mt-3">Добавить проблему</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="glass-card mb-4">
+      <h4 class="section-title">Сводка</h4>
+      <div class="info-list">
+        <div><span>Клиент</span><strong>{{ object.client }}</strong></div>
+        <div><span>Курьер</span><strong>{% if object.courier %}{{ object.courier }}{% else %}-{% endif %}</strong></div>
+        <div><span>Создан</span><strong>{{ object.created_at|date:"d.m.Y H:i" }}</strong></div>
+        <div><span>Доставлен</span><strong>{% if object.delivered_at %}{{ object.delivered_at|date:"d.m.Y H:i" }}{% else %}-{% endif %}</strong></div>
+      </div>
+    </div>
+
+    {% if can_manage and object.status == 'waiting' %}
+    <div class="glass-card mb-4">
+      <h4 class="section-title">Назначить курьера</h4>
+      <form method="post" action="{% url 'Order:assign_courier' object.pk %}">
+        {% csrf_token %}
+        {{ assign_form.courier }}
+        <button class="btn btn-primary w-100 rounded-pill mt-3">Назначить</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if can_change_status %}
+    <div class="glass-card mb-4">
+      <h4 class="section-title">Изменить статус</h4>
+      <form method="post" enctype="multipart/form-data" action="{% url 'Order:add_status' object.pk %}">
+        {% csrf_token %}
+        {% for field in status_form %}
+          {% if field.name != 'tracking_number' %}
+            <div class="mb-2">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+            </div>
+          {% endif %}
+        {% endfor %}
+        <button class="btn btn-primary w-100 rounded-pill">Сохранить</button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if can_confirm %}
+    <div class="glass-card">
+      <h4 class="section-title">Подтверждение клиента</h4>
+      <form method="post" action="{% url 'Order:confirm_delivery' object.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary w-100 rounded-pill">Подтвердить доставку</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

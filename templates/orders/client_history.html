@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Личный кабинет{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Личный кабинет</div>
+    <h1 class="hero-title">Мои заказы</h1>
+    <p class="hero-subtitle">Статусы, маршрут, стоимость и проблемы по заказам.</p>
+  </div>
+</div>
+
+<div class="grid-cards">
+  {% for order in orders %}
+    <a href="{% url 'Order:order_detail' order.pk %}" class="order-card">
+      <div class="card-kicker">{{ order.tracking_number }}</div>
+      <h3 class="card-title">{{ order.get_status_display }}</h3>
+      <div class="route-block">
+        <div class="route-item"><span class="route-label">Забор</span><span class="route-value">{{ order.pickup_address }}</span></div>
+        <div class="route-line"></div>
+        <div class="route-item"><span class="route-label">Доставка</span><span class="route-value">{{ order.delivery_address }}</span></div>
+      </div>
+      <div class="meta-row mt-3">
+        <span>{{ order.delivery_type.name }}</span>
+        <strong>{{ order.delivery_price }} ₽</strong>
+      </div>
+      <div class="mt-3">
+        {% if order.issues.all %}
+          {% for issue in order.issues.all %}
+            <div class="text-muted small">{{ issue.get_issue_type_display }}: {{ issue.description|truncatechars:80 }}</div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted small">Проблемы отсутствуют.</div>
+        {% endif %}
+      </div>
+    </a>
+  {% empty %}
+    <div class="empty-state p-4"><h3>Заказов нет</h3><p>Созданные заказы появятся здесь.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Форма</div>
+    <h1 class="hero-title">{% if object %}Редактирование заказа{% else %}Создание заказа{% endif %}</h1>
+  </div>
+</div>
+
+<div class="glass-card mx-auto form-shell">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-primary btn-lg rounded-pill px-4">Сохранить</button>
+      <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
+    </div>
+  </form>
+</div>
+<script>
+  const pickupPoint = document.getElementById('id_delivery_to_pickup_point');
+  const street = document.getElementById('id_delivery_street');
+  const house = document.getElementById('id_delivery_house');
+  function toggleDeliveryAddress() {
+    const disabled = pickupPoint && pickupPoint.checked;
+    if (street) street.disabled = disabled;
+    if (house) house.disabled = disabled;
+  }
+  if (pickupPoint) {
+    pickupPoint.addEventListener('change', toggleDeliveryAddress);
+    toggleDeliveryAddress();
+  }
+</script>
+{% endblock %}

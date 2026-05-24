@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}Типы доставки{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Каталог услуг</div>
+    <h1 class="hero-title">Типы доставки</h1>
+    <p class="hero-subtitle">Тарифы, лимиты расстояния, веса, объема и коэффициенты стоимости.</p>
+  </div>
+  <a href="{% url 'Order:delivery_type_create' %}" class="btn btn-primary btn-lg rounded-pill px-4">+ Новый тип</a>
+</div>
+
+<div class="grid-cards">
+  {% for type in delivery_types %}
+  <a href="{% url 'Order:delivery_type_detail' type.pk %}" class="order-card">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+      <div>
+        <div class="card-kicker">Тариф</div>
+        <h3 class="card-title">{{ type.name }}</h3>
+      </div>
+      <span class="status-badge status-in_progress">{{ type.max_distance }} км</span>
+    </div>
+    <p class="text-muted">{{ type.description|default:"Описание отсутствует"|truncatechars:120 }}</p>
+    <div class="meta-row mt-3">
+      <span>Базовая цена</span>
+      <strong>{{ type.base_price }} ₽</strong>
+    </div>
+    <div class="meta-row mt-2">
+      <span>{{ type.price_per_kg }} ₽/кг</span>
+      <span>x{{ type.urgency_multiplier }} срочно</span>
+    </div>
+  </a>
+  {% empty %}
+    <div class="empty-state p-4">
+      <h3>Пока нет тарифов</h3>
+      <p>Добавьте первый тип доставки.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

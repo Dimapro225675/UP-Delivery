@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Кабинет курьера{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Курьер</div>
+    <h1 class="hero-title">Мои активные задачи</h1>
+    <p class="hero-subtitle">Заказы, назначенные диспетчером.</p>
+  </div>
+</div>
+
+<div class="grid-cards">
+  {% for order in orders %}
+    <a href="{% url 'Order:order_detail' order.pk %}" class="order-card">
+      <div class="card-kicker">{{ order.tracking_number }}</div>
+      <h3 class="card-title">{{ order.get_status_display }}</h3>
+      <div class="route-block">
+        <div class="route-item"><span class="route-label">Забор</span><span class="route-value">{{ order.pickup_address }}</span></div>
+        <div class="route-line"></div>
+        <div class="route-item"><span class="route-label">Доставка</span><span class="route-value">{{ order.delivery_address }}</span></div>
+      </div>
+    </a>
+  {% empty %}
+    <div class="empty-state p-4"><h3>Задач нет</h3><p>Назначенные заказы появятся здесь.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

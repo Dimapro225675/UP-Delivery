@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}Выход{% endblock %}
+
+{% block content %}
+<div class="detail-hero mb-4">
+  <div>
+    <div class="eyebrow">Аккаунт</div>
+    <h1 class="hero-title">Выйти из аккаунта?</h1>
+    <p class="hero-subtitle">Сеанс будет завершен только после подтверждения.</p>
+  </div>
+</div>
+
+<div class="glass-card mx-auto form-shell">
+  <form method="post">
+    {% csrf_token %}
+    <button class="btn btn-primary btn-lg rounded-pill px-4">Выйти</button>
+    <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
+  </form>
+</div>
+{% endblock %}
