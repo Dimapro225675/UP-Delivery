@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}История статусов{% endblock %}
+
+{% block content %}
+<div class="hero-panel mb-4">
+  <div>
+    <div class="eyebrow">Трекинг</div>
+    <h1 class="hero-title">История статусов</h1>
+    <p class="hero-subtitle">Все изменения по заказам в одном месте.</p>
+  </div>
+</div>
+
+<div class="glass-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>Время</th>
+          <th>Заказ</th>
+          <th>Статус</th>
+          <th>Курьер</th>
+          <th>Локация</th>
+          <th>Комментарий</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in history %}
+        <tr>
+          <td>{{ item.timestamp|date:"d.m.Y H:i" }}</td>
+          <td><a href="{% url 'Order:order_detail' item.order.pk %}">#{{ item.order.pk }}</a></td>
+          <td><span class="status-badge status-{{ item.status }}">{{ item.get_status_display }}</span></td>
+          <td>{% if item.courier %}{{ item.courier.username }}{% else %}—{% endif %}</td>
+          <td>{{ item.location|default:"—" }}</td>
+          <td>{{ item.comment|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted">История пустая.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
