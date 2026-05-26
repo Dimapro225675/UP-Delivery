@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/delivery.css' %}">
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 
 <div class="page-shell">
   <div class="layout">
@@ -25,7 +25,6 @@
       <nav class="sidebar-nav">
         <a href="{% url 'home' %}">Главная</a>
         <a href="{% url 'Order:public_tracking' %}">Поиск по треку</a>
-        <a href="{% url 'Order:order_list' %}">Заказы</a>
         {% if user.is_authenticated and user.is_courier %}
           <a href="{% url 'Order:courier_dashboard' %}">Кабинет курьера</a>
           <a href="{% url 'Order:scan_tracking' %}">Сканирование</a>
@@ -80,9 +79,9 @@
         <div class="footer-col">
           <div class="footer-title">Соглашения</div>
           <ul class="footer-links">
-            <li><a href="#">Правила приёма и доставки</a></li>
+            <li><a href="#">Правила приема и доставки</a></li>
             <li><a href="#">Оферта</a></li>
-            <li><a href="#">Политика сбора ПДн клиентов</a></li>
+            <li><a href="#">Политика сбора ПДН клиентов</a></li>
             <li><a href="#">Пользовательское соглашение</a></li>
             <li><a href="#">Политика экспортного контроля</a></li>
           </ul>
@@ -100,10 +99,10 @@
           </a>
 
           <div class="footer-phone">+7 (495) 009 04 05</div>
-          <div class="footer-hours">Пн–Пт с 5:00 до 22:00 по МСК</div>
+          <div class="footer-hours">Пн-Пт с 5:00 до 22:00 по МСК</div>
 
-          <a class="footer-location" href="#">🌿 Милл Хилл</a>
-          <a class="footer-feedback" href="#">⭐ Оставить отзыв</a>
+          <a class="footer-location" href="#">📍 Москва</a>
+          <a class="footer-feedback" href="#">★ Оставить отзыв</a>
         </div>
       </div>
     </div>

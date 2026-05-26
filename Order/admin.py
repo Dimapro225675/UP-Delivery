@@ -5,6 +5,19 @@ from django.utils.html import format_html
 from .models import AuditLog, DeliveryType, Issue, Order, StatusHistory
 
 
+class ClientAlphabetFilter(admin.SimpleListFilter):
+    title = "Клиент (алфавит)"
+    parameter_name = "client_initial"
+
+    def lookups(self, request, model_admin):
+        return [(letter, letter.upper()) for letter in "abcdefghijklmnopqrstuvwxyz"]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(client__username__istartswith=self.value())
+        return queryset
+
+
 class StatusHistoryInline(admin.TabularInline):
     model = StatusHistory
     extra = 0
@@ -21,11 +34,12 @@ class IssueInline(admin.TabularInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ["tracking_number", "status_badge", "client_link", "courier_link", "delivery_price", "created_at"]
-    list_filter = ["status", "delivery_type", "created_at"]
+    list_filter = ["status", ClientAlphabetFilter, "delivery_type", "created_at"]
     search_fields = ["tracking_number", "pickup_address", "delivery_address", "client__username", "courier__username"]
     date_hierarchy = "created_at"
     readonly_fields = ["tracking_number", "delivery_price", "created_at", "updated_at", "delivered_at"]
     inlines = [StatusHistoryInline, IssueInline]
+    ordering = ["status", "client__username", "tracking_number"]
 
     fieldsets = (
         ("Основная информация", {"fields": ("tracking_number", "client", "courier", "status", "delivery_type")}),

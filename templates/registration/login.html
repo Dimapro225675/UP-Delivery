@@ -1,18 +1,38 @@
 {% extends 'base.html' %}
 
 {% block title %}Авторизация{% endblock %}
+{% block body_class %}auth-page{% endblock %}
 
 {% block content %}
-<h2>Авторизация</h2>
+<div class="auth-modal-shell">
+  <section class="auth-modal">
+    <div class="auth-modal__header">
+      <span class="eyebrow">Аккаунт</span>
+      <h1>Вход</h1>
+      <p>Войдите в систему, чтобы управлять заказами, отслеживать доставки и работать со статусами.</p>
+    </div>
 
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Войти</button>
-</form>
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="form-errors">
+          {{ form.non_field_errors }}
+        </div>
+      {% endif %}
+      {% for field in form %}
+        <div class="form-field">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary">Войти</button>
+    </form>
 
-<p>
-    Еще не зарегистрированы?
-    <a href="{% url 'users:register' %}">Регистрация</a>
-</p>
+    <p class="auth-switch">
+      Еще нет аккаунта?
+      <a href="{% url 'users:register' %}">Регистрация</a>
+    </p>
+  </section>
+</div>
 {% endblock %}

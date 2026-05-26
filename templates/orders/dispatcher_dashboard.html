@@ -6,14 +6,22 @@
   <div>
     <div class="eyebrow">Диспетчер</div>
     <h1 class="hero-title">Активные заказы</h1>
-    <p class="hero-subtitle">Назначение курьеров и контроль статусов.</p>
+    <p class="hero-subtitle">Назначайте курьеров и контролируйте текущие статусы доставки.</p>
   </div>
 </div>
 
 <div class="glass-card">
   <div class="table-responsive">
     <table class="table align-middle">
-      <thead><tr><th>Трек</th><th>Статус</th><th>Маршрут</th><th>Курьер</th><th></th></tr></thead>
+      <thead>
+        <tr>
+          <th>Трек-номер</th>
+          <th>Статус</th>
+          <th>Маршрут</th>
+          <th>Курьер</th>
+          <th></th>
+        </tr>
+      </thead>
       <tbody>
         {% for order in orders %}
         <tr>
@@ -24,7 +32,7 @@
           <td><a href="{% url 'Order:order_detail' order.pk %}" class="btn btn-outline-primary rounded-pill">Открыть</a></td>
         </tr>
         {% empty %}
-        <tr><td colspan="5" class="text-muted">Активных заказов нет.</td></tr>
+        <tr><td colspan="5" class="text-muted">Активных заказов пока нет.</td></tr>
         {% endfor %}
       </tbody>
     </table>

@@ -10,16 +10,67 @@
 <div class="glass-card mx-auto form-shell">
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
-    {{ form.non_field_errors }}
-    {% for field in form %}
-      <div class="mb-3">
-        <label class="form-label">{{ field.label }}</label>
-        {{ field }}
-        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+    {% if form.non_field_errors %}
+      <div class="form-errors">
+        {{ form.non_field_errors }}
       </div>
-    {% endfor %}
-    <div class="d-flex gap-2 mt-4">
+    {% endif %}
+
+    <div class="form-sections">
+      <section class="form-section">
+        <div class="form-section__header">
+          <h2>Маршрут</h2>
+          <p>Укажите точки отправления и получения заказа.</p>
+        </div>
+        <div class="form-grid form-grid--two">
+          {% for field in form %}
+            {% if field.name == 'pickup_city' or field.name == 'pickup_street' or field.name == 'pickup_house' or field.name == 'delivery_to_pickup_point' or field.name == 'delivery_city' or field.name == 'delivery_street' or field.name == 'delivery_house' %}
+              <div class="form-field{% if field.name == 'delivery_to_pickup_point' %} form-field--full form-field--toggle{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="form-section__header">
+          <h2>Параметры отправления</h2>
+          <p>Выберите тип доставки и заполните данные по весу, габаритам и вложениям.</p>
+        </div>
+        <div class="form-grid form-grid--two">
+          {% for field in form %}
+            {% if field.name == 'delivery_type' or field.name == 'weight_kg' or field.name == 'length_cm' or field.name == 'width_cm' or field.name == 'height_cm' or field.name == 'order_photo' or field.name == 'description' %}
+              <div class="form-field{% if field.name == 'description' or field.name == 'order_photo' %} form-field--full{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {% if field.field.widget.input_type == 'file' %}
+                  <div class="image-upload" data-image-upload{% if object and object.order_photo %} data-existing-src="{{ object.order_photo.url }}"{% endif %}>
+                    {{ field }}
+                    <div class="image-upload__controls">
+                      <label for="{{ field.id_for_label }}" class="btn btn-outline-primary image-upload__pick">Выбрать фотографию</label>
+                      <button type="button" class="btn btn-outline-secondary image-upload__reset" data-image-reset hidden>Отменить выбор</button>
+                    </div>
+                    <div class="image-upload__preview" data-image-preview hidden>
+                      <img src="" alt="Превью фотографии заказа" data-image-preview-img>
+                    </div>
+                    <div class="image-upload__meta" data-image-label>Фотография не выбрана</div>
+                  </div>
+                {% else %}
+                  {{ field }}
+                {% endif %}
+                {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <div class="form-actions">
       <button class="btn btn-primary btn-lg rounded-pill px-4">Сохранить</button>
       <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
     </div>
@@ -38,5 +89,54 @@
     pickupPoint.addEventListener('change', toggleDeliveryAddress);
     toggleDeliveryAddress();
   }
+
+  (function () {
+    const uploads = document.querySelectorAll('[data-image-upload]');
+    uploads.forEach((upload) => {
+      const input = upload.querySelector('input[type="file"]');
+      const preview = upload.querySelector('[data-image-preview]');
+      const previewImg = upload.querySelector('[data-image-preview-img]');
+      const label = upload.querySelector('[data-image-label]');
+      const reset = upload.querySelector('[data-image-reset]');
+      const existingSrc = upload.dataset.existingSrc || '';
+
+      const showExisting = () => {
+        if (existingSrc) {
+          preview.hidden = false;
+          previewImg.src = existingSrc;
+          label.textContent = 'Текущее фото';
+          reset.hidden = true;
+        } else {
+          preview.hidden = true;
+          previewImg.removeAttribute('src');
+          label.textContent = 'Фотография не выбрана';
+          reset.hidden = true;
+        }
+      };
+
+      input.addEventListener('change', () => {
+        const [file] = input.files || [];
+        if (!file) {
+          showExisting();
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          preview.hidden = false;
+          previewImg.src = event.target.result;
+          label.textContent = file.name;
+          reset.hidden = false;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      reset.addEventListener('click', () => {
+        input.value = '';
+        showExisting();
+      });
+
+      showExisting();
+    });
+  })();
 </script>
 {% endblock %}

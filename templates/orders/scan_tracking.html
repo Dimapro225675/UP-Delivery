@@ -6,7 +6,7 @@
   <div>
     <div class="eyebrow">Курьерский режим</div>
     <h1 class="hero-title">Смена статуса по трек-номеру</h1>
-    <p class="hero-subtitle">Введите или отсканируйте номер отправления и зафиксируйте действие.</p>
+    <p class="hero-subtitle">Введите или отсканируйте номер отправления и зафиксируйте новое действие.</p>
   </div>
 </div>
 
@@ -14,13 +14,78 @@
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {% for field in form %}
-      <div class="mb-3">
-        <label class="form-label">{{ field.label }}</label>
-        {{ field }}
-        {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      <div class="form-field">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {% if field.field.widget.input_type == 'file' %}
+          <div class="image-upload" data-image-upload data-existing-src="">
+            {{ field }}
+            <div class="image-upload__controls">
+              <label for="{{ field.id_for_label }}" class="btn btn-outline-primary image-upload__pick">Выбрать фотографию</label>
+              <button type="button" class="btn btn-outline-secondary image-upload__reset" data-image-reset hidden>Отменить выбор</button>
+            </div>
+            <div class="image-upload__preview" data-image-preview hidden>
+              <img src="" alt="Превью фотографии" data-image-preview-img>
+            </div>
+            <div class="image-upload__meta" data-image-label>Фотография не выбрана</div>
+          </div>
+        {% else %}
+          {{ field }}
+        {% endif %}
+        {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
       </div>
     {% endfor %}
     <button class="btn btn-primary btn-lg rounded-pill px-4">Обновить</button>
   </form>
 </div>
+
+<script>
+  (function () {
+    const uploads = document.querySelectorAll('[data-image-upload]');
+    uploads.forEach((upload) => {
+      const input = upload.querySelector('input[type="file"]');
+      const preview = upload.querySelector('[data-image-preview]');
+      const previewImg = upload.querySelector('[data-image-preview-img]');
+      const label = upload.querySelector('[data-image-label]');
+      const reset = upload.querySelector('[data-image-reset]');
+      const existingSrc = upload.dataset.existingSrc || '';
+
+      const showExisting = () => {
+        if (existingSrc) {
+          preview.hidden = false;
+          previewImg.src = existingSrc;
+          label.textContent = 'Текущее фото';
+          reset.hidden = true;
+        } else {
+          preview.hidden = true;
+          previewImg.removeAttribute('src');
+          label.textContent = 'Фотография не выбрана';
+          reset.hidden = true;
+        }
+      };
+
+      input.addEventListener('change', () => {
+        const [file] = input.files || [];
+        if (!file) {
+          showExisting();
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          preview.hidden = false;
+          previewImg.src = event.target.result;
+          label.textContent = file.name;
+          reset.hidden = false;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      reset.addEventListener('click', () => {
+        input.value = '';
+        showExisting();
+      });
+
+      showExisting();
+    });
+  })();
+</script>
 {% endblock %}

@@ -105,9 +105,23 @@
         {% csrf_token %}
         {% for field in status_form %}
           {% if field.name != 'tracking_number' %}
-            <div class="mb-2">
-              <label class="form-label">{{ field.label }}</label>
-              {{ field }}
+            <div class="form-field">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {% if field.field.widget.input_type == 'file' %}
+                <div class="image-upload" data-image-upload{% if object.delivery_report_photo %} data-existing-src="{{ object.delivery_report_photo.url }}"{% endif %}>
+                  {{ field }}
+                  <div class="image-upload__controls">
+                    <label for="{{ field.id_for_label }}" class="btn btn-outline-primary image-upload__pick">Выбрать фотографию</label>
+                    <button type="button" class="btn btn-outline-secondary image-upload__reset" data-image-reset hidden>Отменить выбор</button>
+                  </div>
+                  <div class="image-upload__preview" data-image-preview hidden>
+                    <img src="" alt="Превью фотоотчета" data-image-preview-img>
+                  </div>
+                  <div class="image-upload__meta" data-image-label>Фотография не выбрана</div>
+                </div>
+              {% else %}
+                {{ field }}
+              {% endif %}
             </div>
           {% endif %}
         {% endfor %}
@@ -127,4 +141,55 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  (function () {
+    const uploads = document.querySelectorAll('[data-image-upload]');
+    uploads.forEach((upload) => {
+      const input = upload.querySelector('input[type="file"]');
+      const preview = upload.querySelector('[data-image-preview]');
+      const previewImg = upload.querySelector('[data-image-preview-img]');
+      const label = upload.querySelector('[data-image-label]');
+      const reset = upload.querySelector('[data-image-reset]');
+      const existingSrc = upload.dataset.existingSrc || '';
+
+      const showExisting = () => {
+        if (existingSrc) {
+          preview.hidden = false;
+          previewImg.src = existingSrc;
+          label.textContent = 'Текущее фото';
+          reset.hidden = true;
+        } else {
+          preview.hidden = true;
+          previewImg.removeAttribute('src');
+          label.textContent = 'Фотография не выбрана';
+          reset.hidden = true;
+        }
+      };
+
+      input.addEventListener('change', () => {
+        const [file] = input.files || [];
+        if (!file) {
+          showExisting();
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          preview.hidden = false;
+          previewImg.src = event.target.result;
+          label.textContent = file.name;
+          reset.hidden = false;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      reset.addEventListener('click', () => {
+        input.value = '';
+        showExisting();
+      });
+
+      showExisting();
+    });
+  })();
+</script>
 {% endblock %}

@@ -7,10 +7,20 @@ from django.core.exceptions import ValidationError
 from .models import CustomUser
 
 
-class RegisterForm(UserCreationForm):
+class StyledFieldsMixin:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs["class"] = f"{field.widget.attrs.get('class', '')} form-control".strip()
+            if isinstance(field.widget, forms.PasswordInput):
+                field.widget.attrs.setdefault("autocomplete", "current-password")
+
+
+class RegisterForm(StyledFieldsMixin, UserCreationForm):
     full_name = forms.CharField(label="ФИО", max_length=150)
     phone = forms.CharField(label="Телефон", max_length=16)
     email = forms.EmailField(label="Email")
+
     class Meta:
         model = CustomUser
         fields = ("username", "full_name", "phone", "email", "password1", "password2")
@@ -39,6 +49,6 @@ class RegisterForm(UserCreationForm):
         return phone
 
 
-class LoginForm(AuthenticationForm):
+class LoginForm(StyledFieldsMixin, AuthenticationForm):
     username = forms.CharField(label="Логин", max_length=150)
     password = forms.CharField(label="Пароль", widget=forms.PasswordInput)

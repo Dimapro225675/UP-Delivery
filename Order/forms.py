@@ -20,6 +20,9 @@ class BootstrapFormMixin:
             elif isinstance(widget, forms.Textarea):
                 widget.attrs["class"] = self.field_classes
                 widget.attrs.setdefault("rows", 3)
+            elif isinstance(widget, forms.ClearableFileInput):
+                widget.attrs["class"] = f"{self.field_classes} image-input".strip()
+                widget.attrs["accept"] = "image/*"
             else:
                 widget.attrs["class"] = self.field_classes
 
