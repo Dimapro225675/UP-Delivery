@@ -17,20 +17,19 @@
       <div class="form-field">
         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
         {% if field.field.widget.input_type == 'file' %}
-          <div class="image-upload" data-image-upload data-existing-src="">
+          <div class="image-upload" data-multi-upload>
             {{ field }}
             <div class="image-upload__controls">
-              <label for="{{ field.id_for_label }}" class="btn btn-outline-primary image-upload__pick">Выбрать фотографию</label>
-              <button type="button" class="btn btn-outline-secondary image-upload__reset" data-image-reset hidden>Отменить выбор</button>
+              <label for="{{ field.id_for_label }}" class="btn btn-outline-primary image-upload__pick">Выбрать фотографии</label>
+              <button type="button" class="btn btn-outline-secondary image-upload__reset" data-image-reset hidden>Очистить</button>
             </div>
-            <div class="image-upload__preview" data-image-preview hidden>
-              <img src="" alt="Превью фотографии" data-image-preview-img>
-            </div>
-            <div class="image-upload__meta" data-image-label>Фотография не выбрана</div>
+            <div class="image-upload__gallery" data-image-preview-list hidden></div>
+            <div class="image-upload__meta" data-image-label>Фотографии не выбраны</div>
           </div>
         {% else %}
           {{ field }}
         {% endif %}
+        {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
         {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
       </div>
     {% endfor %}
@@ -40,51 +39,64 @@
 
 <script>
   (function () {
-    const uploads = document.querySelectorAll('[data-image-upload]');
+    const uploads = document.querySelectorAll('[data-multi-upload]');
+
+    const syncPreviews = (previewList, files) => {
+      previewList.innerHTML = '';
+      if (!files.length) {
+        previewList.hidden = true;
+        return;
+      }
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const item = document.createElement('div');
+          item.className = 'image-upload__thumb';
+          item.innerHTML = `<img src="${event.target.result}" alt="${file.name}">`;
+          previewList.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+      });
+      previewList.hidden = false;
+    };
+
     uploads.forEach((upload) => {
       const input = upload.querySelector('input[type="file"]');
-      const preview = upload.querySelector('[data-image-preview]');
-      const previewImg = upload.querySelector('[data-image-preview-img]');
       const label = upload.querySelector('[data-image-label]');
       const reset = upload.querySelector('[data-image-reset]');
-      const existingSrc = upload.dataset.existingSrc || '';
+      const previewList = upload.querySelector('[data-image-preview-list]');
+      let queuedFiles = [];
 
-      const showExisting = () => {
-        if (existingSrc) {
-          preview.hidden = false;
-          previewImg.src = existingSrc;
-          label.textContent = 'Текущее фото';
-          reset.hidden = true;
+      const refreshState = () => {
+        const transfer = new DataTransfer();
+        queuedFiles.forEach((file) => transfer.items.add(file));
+        input.files = transfer.files;
+        syncPreviews(previewList, queuedFiles);
+        if (queuedFiles.length) {
+          label.textContent = `Выбрано файлов: ${queuedFiles.length}`;
+          reset.hidden = false;
         } else {
-          preview.hidden = true;
-          previewImg.removeAttribute('src');
-          label.textContent = 'Фотография не выбрана';
+          label.textContent = 'Фотографии не выбраны';
           reset.hidden = true;
         }
       };
 
       input.addEventListener('change', () => {
-        const [file] = input.files || [];
-        if (!file) {
-          showExisting();
+        const incomingFiles = Array.from(input.files || []);
+        if (!incomingFiles.length) {
+          refreshState();
           return;
         }
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          preview.hidden = false;
-          previewImg.src = event.target.result;
-          label.textContent = file.name;
-          reset.hidden = false;
-        };
-        reader.readAsDataURL(file);
+        queuedFiles = [...queuedFiles, ...incomingFiles];
+        refreshState();
       });
 
       reset.addEventListener('click', () => {
-        input.value = '';
-        showExisting();
+        queuedFiles = [];
+        refreshState();
       });
 
-      showExisting();
+      refreshState();
     });
   })();
 </script>

@@ -6,7 +6,7 @@
   <div>
     <div class="eyebrow">Каталог услуг</div>
     <h1 class="hero-title">Типы доставки</h1>
-    <p class="hero-subtitle">Тарифы, лимиты расстояния, веса, объема и коэффициенты стоимости.</p>
+    <p class="hero-subtitle">Тарифы и лимиты расстояния для доступных способов доставки.</p>
   </div>
   <a href="{% url 'Order:delivery_type_create' %}" class="btn btn-primary btn-lg rounded-pill px-4">+ Новый тип</a>
 </div>
@@ -25,10 +25,6 @@
     <div class="meta-row mt-3">
       <span>Базовая цена</span>
       <strong>{{ type.base_price }} ₽</strong>
-    </div>
-    <div class="meta-row mt-2">
-      <span>{{ type.price_per_kg }} ₽/кг</span>
-      <span>x{{ type.urgency_multiplier }} срочно</span>
     </div>
   </a>
   {% empty %}

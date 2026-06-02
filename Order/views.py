@@ -14,7 +14,7 @@ from .forms import (
     OrderForm,
     StatusUpdateForm,
 )
-from .models import AuditLog, DeliveryType, Issue, Order, StatusHistory
+from .models import AuditLog, DeliveryReportPhoto, DeliveryType, Issue, Order, OrderPhoto, StatusHistory
 
 
 def can_view_order(user, order):
@@ -46,6 +46,14 @@ def get_allowed_statuses(user, order):
         if order.status == Order.STATUS_DELIVERING:
             return {Order.STATUS_DELIVERED_PICKUP_POINT, Order.STATUS_DELIVERED_ADDRESS}
     return set()
+
+
+def create_order_photos(order, files):
+    OrderPhoto.objects.bulk_create([OrderPhoto(order=order, image=file) for file in files])
+
+
+def create_delivery_report_photos(order, files):
+    DeliveryReportPhoto.objects.bulk_create([DeliveryReportPhoto(order=order, image=file) for file in files])
 
 
 class StaffRequiredMixin(LoginRequiredMixin):
@@ -93,7 +101,7 @@ class OrderListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        queryset = Order.objects.select_related("client", "courier", "delivery_type")
+        queryset = Order.objects.select_related("client", "courier", "delivery_type").prefetch_related("order_photos")
         user = self.request.user
         if getattr(user, "is_client", False):
             queryset = queryset.filter(client=user).exclude(status=Order.STATUS_CONFIRMED)
@@ -125,7 +133,10 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
     template_name = "orders/order_detail.html"
 
     def get_queryset(self):
-        return Order.objects.select_related("client", "courier", "delivery_type")
+        return (
+            Order.objects.select_related("client", "courier", "delivery_type")
+            .prefetch_related("order_photos", "delivery_report_photos", "issues", "status_history")
+        )
 
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -158,9 +169,14 @@ class OrderCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy("Order:order_list")
 
     def form_valid(self, form):
+        files = self.request.FILES.getlist("order_photos")
+        if not files:
+            form.add_error("order_photos", "Добавьте хотя бы одну фотографию заказа")
+            return self.form_invalid(form)
         form.instance.client = self.request.user
         form.instance.status = Order.STATUS_WAITING
         response = super().form_valid(form)
+        create_order_photos(self.object, files)
         StatusHistory.objects.create(order=self.object, status=self.object.status, courier=self.request.user, comment="Заказ создан")
         AuditLog.objects.create(user=self.request.user, order=self.object, action="order_created", details="Создан новый заказ")
         messages.success(self.request, f"Заказ создан. Трекинг-номер: {self.object.tracking_number}")
@@ -182,7 +198,13 @@ class OrderUpdateView(LoginRequiredMixin, UpdateView):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        files = self.request.FILES.getlist("order_photos")
+        if not files and not self.object.order_photos.exists():
+            form.add_error("order_photos", "Добавьте хотя бы одну фотографию заказа")
+            return self.form_invalid(form)
         response = super().form_valid(form)
+        if files:
+            create_order_photos(self.object, files)
         AuditLog.objects.create(user=self.request.user, order=self.object, action="order_updated", details="Обновлены данные заказа")
         messages.success(self.request, "Заказ обновлен")
         return response
@@ -273,18 +295,17 @@ def add_status_history(request, order_id):
 
     form = StatusUpdateForm(request.POST, request.FILES, allowed_statuses=get_allowed_statuses(request.user, order))
     if form.is_valid():
+        files = request.FILES.getlist("delivery_report_photos")
         try:
-            if form.cleaned_data["status"] == Order.STATUS_DELIVERED_ADDRESS and not (
-                form.cleaned_data.get("delivery_report_photo") or order.delivery_report_photo
-            ):
+            if form.cleaned_data["status"] == Order.STATUS_DELIVERED_ADDRESS and not (files or order.delivery_report_photos.exists()):
                 raise ValidationError("Для доставки по адресу нужно загрузить фотоотчет")
-            if form.cleaned_data.get("delivery_report_photo"):
-                order.delivery_report_photo = form.cleaned_data["delivery_report_photo"]
             order.set_status(
                 form.cleaned_data["status"],
                 user=request.user,
                 comment=form.cleaned_data["comment"],
             )
+            if files:
+                create_delivery_report_photos(order, files)
             messages.success(request, "Статус обновлен")
         except ValidationError as error:
             messages.error(request, "; ".join(error.messages))
@@ -306,7 +327,10 @@ def public_tracking(request):
     history = []
     query = request.GET.get("tracking_number", "").strip()
     if query:
-        order = get_object_or_404(Order.objects.select_related("client", "courier", "delivery_type"), tracking_number=query)
+        order = get_object_or_404(
+            Order.objects.select_related("client", "courier", "delivery_type").prefetch_related("delivery_report_photos", "order_photos"),
+            tracking_number=query,
+        )
         history = order.status_history.select_related("courier")
     return render(request, "orders/public_tracking.html", {"order": order, "history": history, "query": query})
 
@@ -317,9 +341,7 @@ class ClientHistoryView(LoginRequiredMixin, ListView):
     context_object_name = "orders"
 
     def get_queryset(self):
-        return Order.objects.select_related("delivery_type", "courier").prefetch_related("issues").filter(
-            client=self.request.user,
-        )
+        return Order.objects.select_related("delivery_type", "courier").prefetch_related("issues").filter(client=self.request.user)
 
 
 def scan_tracking(request):
@@ -332,19 +354,18 @@ def scan_tracking(request):
         if not can_view_order(request.user, order):
             raise PermissionDenied
         if form.is_valid():
-            if form.cleaned_data["status"] == Order.STATUS_DELIVERED_ADDRESS and not (
-                form.cleaned_data.get("delivery_report_photo") or order.delivery_report_photo
-            ):
+            files = request.FILES.getlist("delivery_report_photos")
+            if form.cleaned_data["status"] == Order.STATUS_DELIVERED_ADDRESS and not (files or order.delivery_report_photos.exists()):
                 messages.error(request, "Для доставки по адресу нужно загрузить фотоотчет")
                 return redirect("Order:order_detail", pk=order.pk)
-            if form.cleaned_data.get("delivery_report_photo"):
-                order.delivery_report_photo = form.cleaned_data["delivery_report_photo"]
             try:
                 order.set_status(
                     form.cleaned_data["status"],
                     user=request.user,
                     comment=form.cleaned_data["comment"],
                 )
+                if files:
+                    create_delivery_report_photos(order, files)
                 messages.success(request, "Статус по трекинг-номеру обновлен")
                 return redirect("Order:order_detail", pk=order.pk)
             except ValidationError as error:
@@ -364,11 +385,6 @@ class IssueCreateView(StaffRequiredMixin, CreateView):
         form.instance.order = order
         form.instance.created_by = self.request.user
         response = super().form_valid(form)
-        order.delivery_attempts += 1
-        if order.delivery_attempts >= order.max_delivery_attempts and order.status == Order.STATUS_DELIVERING:
-            order.set_status(Order.STATUS_RETURNED, user=self.request.user, comment="Превышено число попыток вручения")
-        else:
-            order.save()
         AuditLog.objects.create(user=self.request.user, order=order, action="issue_created", details=form.instance.description)
         messages.success(self.request, "Исключительная ситуация зарегистрирована")
         return response
@@ -395,7 +411,9 @@ def home(request):
             orders = orders.filter(courier=request.user)
     total_orders = orders.count()
     active_orders = orders.filter(status__in=[Order.STATUS_WAITING, Order.STATUS_WAITING_COURIER, Order.STATUS_DELIVERING]).count()
-    delivered_orders = orders.filter(status__in=[Order.STATUS_DELIVERED_PICKUP_POINT, Order.STATUS_DELIVERED_ADDRESS, Order.STATUS_CONFIRMED]).count()
+    delivered_orders = orders.filter(
+        status__in=[Order.STATUS_DELIVERED_PICKUP_POINT, Order.STATUS_DELIVERED_ADDRESS, Order.STATUS_CONFIRMED]
+    ).count()
     issues_count = Issue.objects.filter(resolved=False).count()
     latest_orders = orders.select_related("client", "delivery_type").order_by("-created_at")[:5]
     return render(

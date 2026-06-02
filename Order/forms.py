@@ -1,7 +1,35 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.core.files.images import get_image_dimensions
 
 from .models import DeliveryType, Issue, Order
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    widget = MultipleFileInput
+
+    def clean(self, data, initial=None):
+        single_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            cleaned_files = [single_clean(item, initial) for item in data]
+            self.validate_dimensions(cleaned_files)
+            return cleaned_files
+        cleaned_file = single_clean(data, initial)
+        self.validate_dimensions([cleaned_file] if cleaned_file else [])
+        return cleaned_file
+
+    @staticmethod
+    def validate_dimensions(files):
+        for uploaded_file in files:
+            width, height = get_image_dimensions(uploaded_file)
+            uploaded_file.seek(0)
+            if width > 550 or height > 550:
+                raise ValidationError("Изображение должно быть не больше 550x550 пикселей.")
 
 
 class BootstrapFormMixin:
@@ -35,14 +63,16 @@ class DeliveryTypeForm(BootstrapFormMixin, forms.ModelForm):
             "description",
             "max_distance",
             "base_price",
-            "price_per_kg",
-            "price_per_m3",
-            "declared_value_percent",
-            "urgency_multiplier",
         ]
 
 
 class OrderForm(BootstrapFormMixin, forms.ModelForm):
+    order_photos = MultipleFileField(
+        label="Фотографии заказа",
+        required=False,
+        help_text="Можно выбрать сразу несколько фотографий.",
+    )
+
     class Meta:
         model = Order
         fields = [
@@ -58,7 +88,6 @@ class OrderForm(BootstrapFormMixin, forms.ModelForm):
             "length_cm",
             "width_cm",
             "height_cm",
-            "order_photo",
             "description",
         ]
         widgets = {
@@ -84,8 +113,8 @@ class DispatcherAssignCourierForm(BootstrapFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        User = get_user_model()
-        self.fields["courier"].queryset = User.objects.filter(role=User.ROLE_COURIER)
+        user_model = get_user_model()
+        self.fields["courier"].queryset = user_model.objects.filter(role=user_model.ROLE_COURIER)
         self.fields["courier"].required = True
 
 
@@ -93,7 +122,11 @@ class StatusUpdateForm(BootstrapFormMixin, forms.Form):
     tracking_number = forms.CharField(label="Трекинг-номер", max_length=24, required=False)
     status = forms.ChoiceField(label="Новый статус", choices=Order.STATUS_CHOICES)
     comment = forms.CharField(label="Комментарий", widget=forms.Textarea(attrs={"rows": 3}), required=False)
-    delivery_report_photo = forms.FileField(label="Фотоотчет доставки", required=False)
+    delivery_report_photos = MultipleFileField(
+        label="Фотоотчет доставки",
+        required=False,
+        help_text="Можно выбрать сразу несколько фотографий.",
+    )
 
     def __init__(self, *args, allowed_statuses=None, **kwargs):
         super().__init__(*args, **kwargs)

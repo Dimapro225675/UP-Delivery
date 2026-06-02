@@ -12,10 +12,6 @@ class DeliveryType(models.Model):
     description = models.TextField("Описание", blank=True)
     max_distance = models.PositiveIntegerField("Макс. расстояние", help_text="Максимальное расстояние в км")
     base_price = models.DecimalField("Базовая цена", max_digits=10, decimal_places=2)
-    price_per_kg = models.DecimalField("Цена за кг", max_digits=10, decimal_places=2, default=Decimal("30.00"))
-    price_per_m3 = models.DecimalField("Цена за м3", max_digits=10, decimal_places=2, default=Decimal("500.00"))
-    declared_value_percent = models.DecimalField("Процент от ценности", max_digits=5, decimal_places=2, default=Decimal("1.00"))
-    urgency_multiplier = models.DecimalField("Коэффициент срочности", max_digits=5, decimal_places=2, default=Decimal("1.00"))
 
     class Meta:
         verbose_name = "Тип доставки"
@@ -36,8 +32,8 @@ class Order(models.Model):
     STATUS_CANCELLED = "cancelled"
 
     STATUS_CHOICES = [
-        (STATUS_WAITING, "В ожидание"),
-        (STATUS_WAITING_COURIER, "В ожидание курьера"),
+        (STATUS_WAITING, "В ожидании"),
+        (STATUS_WAITING_COURIER, "В ожидании курьера"),
         (STATUS_DELIVERING, "Доставляется"),
         (STATUS_DELIVERED_PICKUP_POINT, "Доставлен на пункт выдачи"),
         (STATUS_DELIVERED_ADDRESS, "Доставлен на адрес доставки"),
@@ -88,7 +84,6 @@ class Order(models.Model):
         (CARGO_FOOD, "Продукты"),
         (CARGO_OTHER, "Другое"),
     ]
-    FORBIDDEN_CARGO_TYPES = {"weapons", "animals", "hazardous"}
 
     CONFIRM_SIGNATURE = "signature"
     CONFIRM_PHOTO = "photo"
@@ -138,18 +133,10 @@ class Order(models.Model):
     length_cm = models.DecimalField("Длина, см", max_digits=7, decimal_places=2)
     width_cm = models.DecimalField("Ширина, см", max_digits=7, decimal_places=2)
     height_cm = models.DecimalField("Высота, см", max_digits=7, decimal_places=2)
-    order_photo = models.FileField(
-        "Фотография заказа",
-        upload_to="orders/photos/",
-        blank=True,
-        help_text="Фото со всех сторон. Для документов, писем и конвертов - фото конверта или файла.",
-    )
     declared_value = models.DecimalField("Ценность отправления", max_digits=10, decimal_places=2, default=0)
     urgency = models.BooleanField("Срочная доставка", default=False)
     delivery_price = models.DecimalField("Стоимость доставки", max_digits=10, decimal_places=2, default=0)
     status = models.CharField("Статус", max_length=30, choices=STATUS_CHOICES, default=STATUS_WAITING)
-    delivery_attempts = models.PositiveSmallIntegerField("Попытки вручения", default=0)
-    max_delivery_attempts = models.PositiveSmallIntegerField("Максимум попыток", default=3)
     confirmation_type = models.CharField(
         "Способ подтверждения",
         max_length=20,
@@ -157,7 +144,6 @@ class Order(models.Model):
         blank=True,
     )
     confirmation_value = models.CharField("Документальное подтверждение", max_length=255, blank=True)
-    delivery_report_photo = models.FileField("Фотоотчет доставки", upload_to="orders/reports/", blank=True)
     client_confirmed_at = models.DateTimeField("Подтвержден клиентом", null=True, blank=True)
     delivered_at = models.DateTimeField("Дата вручения", null=True, blank=True)
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -190,6 +176,14 @@ class Order(models.Model):
             return f"{self.get_delivery_city_display()}, пункт выдачи"
         return f"{self.get_delivery_city_display()}, {self.delivery_street}, д. {self.delivery_house}"
 
+    @property
+    def primary_order_photo(self):
+        return self.order_photos.first()
+
+    @property
+    def primary_delivery_report_photo(self):
+        return self.delivery_report_photos.first()
+
     def clean(self):
         errors = {}
         for field in ("pickup_city", "pickup_street", "pickup_house", "delivery_city"):
@@ -200,14 +194,10 @@ class Order(models.Model):
                 errors["delivery_street"] = "Укажите улицу доставки"
             if not self.delivery_house:
                 errors["delivery_house"] = "Укажите дом доставки"
-        if not self.order_photo:
-            errors["order_photo"] = "Добавьте фотографию заказа"
         for field in ("weight_kg", "length_cm", "width_cm", "height_cm"):
             value = getattr(self, field)
             if value is not None and value <= 0:
                 errors[field] = "Значение должно быть больше нуля"
-        if self.status == self.STATUS_DELIVERED_ADDRESS and not self.delivery_report_photo:
-            errors["delivery_report_photo"] = "Для доставки по адресу нужен фотоотчет"
         if errors:
             raise ValidationError(errors)
 
@@ -257,7 +247,9 @@ class Order(models.Model):
         if new_status not in dict(self.STATUS_CHOICES):
             raise ValidationError("Неизвестный статус")
         if new_status != self.status and new_status not in self.STATUS_FLOW.get(self.status, set()):
-            raise ValidationError(f"Нельзя изменить статус с '{self.get_status_display()}' на '{dict(self.STATUS_CHOICES)[new_status]}'")
+            raise ValidationError(
+                f"Нельзя изменить статус с '{self.get_status_display()}' на '{dict(self.STATUS_CHOICES)[new_status]}'"
+            )
         with transaction.atomic():
             self.status = new_status
             if confirmation_type:
@@ -277,6 +269,34 @@ class Order(models.Model):
                 action="status_changed",
                 details=f"Статус изменен на {self.get_status_display()}. {comment}",
             )
+
+
+class OrderPhoto(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="order_photos", verbose_name="Заказ")
+    image = models.FileField("Фотография заказа", upload_to="orders/photos/")
+    created_at = models.DateTimeField("Добавлено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фотография заказа"
+        verbose_name_plural = "Фотографии заказа"
+        ordering = ["created_at", "pk"]
+
+    def __str__(self):
+        return f"{self.order.tracking_number}: фото {self.pk}"
+
+
+class DeliveryReportPhoto(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="delivery_report_photos", verbose_name="Заказ")
+    image = models.FileField("Фотоотчет доставки", upload_to="orders/reports/")
+    created_at = models.DateTimeField("Добавлено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Фотоотчет доставки"
+        verbose_name_plural = "Фотоотчеты доставки"
+        ordering = ["created_at", "pk"]
+
+    def __str__(self):
+        return f"{self.order.tracking_number}: отчет {self.pk}"
 
 
 class StatusHistory(models.Model):
@@ -334,7 +354,13 @@ class Issue(models.Model):
 
 
 class AuditLog(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Пользователь")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Пользователь",
+    )
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="audit_logs", verbose_name="Заказ")
     action = models.CharField("Действие", max_length=50)
     details = models.TextField("Детали", blank=True)

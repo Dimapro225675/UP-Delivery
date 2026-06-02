@@ -2,7 +2,15 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import AuditLog, DeliveryType, Issue, Order, StatusHistory
+from .models import (
+    AuditLog,
+    DeliveryReportPhoto,
+    DeliveryType,
+    Issue,
+    Order,
+    OrderPhoto,
+    StatusHistory,
+)
 
 
 class ClientAlphabetFilter(admin.SimpleListFilter):
@@ -31,6 +39,20 @@ class IssueInline(admin.TabularInline):
     fields = ["issue_type", "description", "resolved", "resolved_at"]
 
 
+class OrderPhotoInline(admin.TabularInline):
+    model = OrderPhoto
+    extra = 0
+    fields = ["image", "created_at"]
+    readonly_fields = ["created_at"]
+
+
+class DeliveryReportPhotoInline(admin.TabularInline):
+    model = DeliveryReportPhoto
+    extra = 0
+    fields = ["image", "created_at"]
+    readonly_fields = ["created_at"]
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = ["tracking_number", "status_badge", "client_link", "courier_link", "delivery_price", "created_at"]
@@ -38,15 +60,15 @@ class OrderAdmin(admin.ModelAdmin):
     search_fields = ["tracking_number", "pickup_address", "delivery_address", "client__username", "courier__username"]
     date_hierarchy = "created_at"
     readonly_fields = ["tracking_number", "delivery_price", "created_at", "updated_at", "delivered_at"]
-    inlines = [StatusHistoryInline, IssueInline]
+    inlines = [OrderPhotoInline, DeliveryReportPhotoInline, StatusHistoryInline, IssueInline]
     ordering = ["status", "client__username", "tracking_number"]
 
     fieldsets = (
         ("Основная информация", {"fields": ("tracking_number", "client", "courier", "status", "delivery_type")}),
         ("Маршрут", {"fields": ("pickup_city", "pickup_street", "pickup_house", "delivery_to_pickup_point", "delivery_city", "delivery_street", "delivery_house", "distance_km")}),
-        ("Груз", {"fields": ("weight_kg", "length_cm", "width_cm", "height_cm", "order_photo")}),
+        ("Груз", {"fields": ("weight_kg", "length_cm", "width_cm", "height_cm")}),
         ("Стоимость", {"fields": ("delivery_price",)}),
-        ("Вручение", {"fields": ("delivery_attempts", "max_delivery_attempts", "delivery_report_photo", "delivered_at", "client_confirmed_at")}),
+        ("Вручение", {"fields": ("delivered_at", "client_confirmed_at")}),
         ("Служебное", {"fields": ("description", "created_at", "updated_at")}),
     )
 
@@ -82,7 +104,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryType)
 class DeliveryTypeAdmin(admin.ModelAdmin):
-    list_display = ["name", "max_distance", "base_price", "price_per_kg", "price_per_m3", "urgency_multiplier"]
+    list_display = ["name", "max_distance", "base_price"]
     search_fields = ["name"]
 
     def has_module_permission(self, request):
