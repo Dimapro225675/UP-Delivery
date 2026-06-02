@@ -52,6 +52,25 @@ class Order(models.Model):
         STATUS_CANCELLED: set(),
     }
 
+    ACTIVE_STATUSES = {
+        STATUS_WAITING,
+        STATUS_WAITING_COURIER,
+        STATUS_DELIVERING,
+    }
+    DELIVERED_STATUSES = {
+        STATUS_DELIVERED_PICKUP_POINT,
+        STATUS_DELIVERED_ADDRESS,
+    }
+    TERMINAL_STATUSES = DELIVERED_STATUSES | {
+        STATUS_CONFIRMED,
+        STATUS_RETURNED,
+        STATUS_CANCELLED,
+    }
+    COURIER_WORK_STATUSES = {
+        STATUS_WAITING_COURIER,
+        STATUS_DELIVERING,
+    }
+
     CITY_CHOICES = [
         ("moscow", "Москва"),
         ("tver", "Тверь"),
@@ -84,6 +103,9 @@ class Order(models.Model):
         frozenset(("kazan", "ekb")): 950,
         frozenset(("nizhny", "ekb")): 1300,
     }
+    DEFAULT_INTERCITY_DISTANCE_KM = 100
+    SAME_CITY_DISTANCE_KM = 0
+    SAME_DAY_DELIVERY_LIMIT_KM = 150
 
     CARGO_DOCUMENTS = "documents"
     CARGO_PARCEL = "parcel"
@@ -175,6 +197,30 @@ class Order(models.Model):
     def __str__(self):
         return f"{self.tracking_number} - {self.get_status_display()}"
 
+    @classmethod
+    def city_distances_payload(cls):
+        return {",".join(sorted(key)): value for key, value in cls.CITY_DISTANCES_KM.items()}
+
+    @classmethod
+    def delivery_pricing_payload(cls):
+        return {
+            "included_weight_kg": float(cls.INCLUDED_WEIGHT_KG),
+            "included_side_cm": float(cls.INCLUDED_SIDE_CM),
+            "address_delivery_surcharge": float(cls.ADDRESS_DELIVERY_SURCHARGE),
+            "overweight_price_per_kg": float(cls.OVERWEIGHT_PRICE_PER_KG),
+            "oversize_price_per_10_cm": float(cls.OVERSIZE_PRICE_PER_10_CM),
+            "intercity_price_per_10_km": float(cls.INTERCITY_PRICE_PER_10_KM),
+            "city_distances_km": cls.city_distances_payload(),
+        }
+
+    @classmethod
+    def delivery_type_payload(cls):
+        return list(DeliveryType.objects.order_by("name").values("id", "name", "base_price", "max_distance"))
+
+    @classmethod
+    def status_requires_delivery_report(cls, status):
+        return status == cls.STATUS_DELIVERED_ADDRESS
+
     @property
     def volume_m3(self):
         return (self.length_cm * self.width_cm * self.height_cm) / Decimal("1000000")
@@ -199,33 +245,43 @@ class Order(models.Model):
 
     @property
     def estimated_delivery_window(self):
-        if self.distance_km < 150:
+        if self.distance_km < self.SAME_DAY_DELIVERY_LIMIT_KM:
             return "В течение дня"
         return "В течение недели"
 
     def clean(self):
         errors = {}
+        self._validate_route_fields(errors)
+        self._validate_dimensions(errors)
+        self._validate_delivery_type(errors)
+        if errors:
+            raise ValidationError(errors)
+
+    def _validate_route_fields(self, errors):
         for field in ("pickup_city", "pickup_street", "pickup_house", "delivery_city"):
             if not getattr(self, field):
-                errors[field] = "Обязательное поле"
+                errors[field] = "Обязательное поле."
         if not self.delivery_to_pickup_point:
             if not self.delivery_street:
-                errors["delivery_street"] = "Укажите улицу доставки"
+                errors["delivery_street"] = "Укажите улицу доставки."
             if not self.delivery_house:
-                errors["delivery_house"] = "Укажите дом доставки"
+                errors["delivery_house"] = "Укажите дом доставки."
+
+    def _validate_dimensions(self, errors):
         for field in ("weight_kg", "length_cm", "width_cm", "height_cm"):
             value = getattr(self, field)
             if value is not None and value <= 0:
-                errors[field] = "Значение должно быть больше нуля"
-        if self.delivery_type_id:
-            distance_km = self.calculate_distance_km()
-            if distance_km > self.delivery_type.max_distance:
-                errors["delivery_type"] = (
-                    f"РўРёРї РґРѕСЃС‚Р°РІРєРё РЅРµ РїРѕРґС…РѕРґРёС‚: РјР°РєСЃРёРјСѓРј {self.delivery_type.max_distance} РєРј, "
-                    f"Р° РјРµР¶РґСѓ РіРѕСЂРѕРґР°РјРё {distance_km} РєРј."
-                )
-        if errors:
-            raise ValidationError(errors)
+                errors[field] = "Значение должно быть больше нуля."
+
+    def _validate_delivery_type(self, errors):
+        if not self.delivery_type_id:
+            return
+        distance_km = self.calculate_distance_km()
+        if distance_km > self.delivery_type.max_distance:
+            errors["delivery_type"] = (
+                f"Тип доставки не подходит: максимум {self.delivery_type.max_distance} км, "
+                f"а между городами {distance_km} км."
+            )
 
     def save(self, *args, **kwargs):
         if not self.tracking_number:
@@ -234,7 +290,7 @@ class Order(models.Model):
         self.delivery_address = self.delivery_address_display
         self.distance_km = self.calculate_distance_km()
         self.delivery_price = self.calculate_delivery_price()
-        if self.status in {self.STATUS_DELIVERED_PICKUP_POINT, self.STATUS_DELIVERED_ADDRESS} and not self.delivered_at:
+        if self.status in self.DELIVERED_STATUSES and not self.delivered_at:
             self.delivered_at = timezone.now()
         if self.status == self.STATUS_CONFIRMED and not self.client_confirmed_at:
             self.client_confirmed_at = timezone.now()
@@ -250,32 +306,46 @@ class Order(models.Model):
     def calculate_delivery_price(self):
         if not self.delivery_type_id:
             return Decimal("0.00")
+
         total = self.delivery_type.base_price
         if not self.delivery_to_pickup_point:
             total += self.ADDRESS_DELIVERY_SURCHARGE
+
         if self.weight_kg > self.INCLUDED_WEIGHT_KG:
             total += (self.weight_kg - self.INCLUDED_WEIGHT_KG) * self.OVERWEIGHT_PRICE_PER_KG
+
         for side in (self.length_cm, self.width_cm, self.height_cm):
             if side > self.INCLUDED_SIDE_CM:
-                extra_blocks = ((side - self.INCLUDED_SIDE_CM) / Decimal("10")).to_integral_value(rounding=ROUND_CEILING)
+                extra_blocks = ((side - self.INCLUDED_SIDE_CM) / Decimal("10")).to_integral_value(
+                    rounding=ROUND_CEILING
+                )
                 total += extra_blocks * self.OVERSIZE_PRICE_PER_10_CM
+
         if self.pickup_city != self.delivery_city:
-            distance_blocks = (Decimal(self.calculate_distance_km()) / Decimal("10")).to_integral_value(rounding=ROUND_CEILING)
+            distance_blocks = (Decimal(self.calculate_distance_km()) / Decimal("10")).to_integral_value(
+                rounding=ROUND_CEILING
+            )
             total += distance_blocks * self.INTERCITY_PRICE_PER_10_KM
+
         return total.quantize(Decimal("0.01"))
 
     def calculate_distance_km(self):
         if self.pickup_city == self.delivery_city:
-            return 0
-        return self.CITY_DISTANCES_KM.get(frozenset((self.pickup_city, self.delivery_city)), 100)
+            return self.SAME_CITY_DISTANCE_KM
+        return self.CITY_DISTANCES_KM.get(
+            frozenset((self.pickup_city, self.delivery_city)),
+            self.DEFAULT_INTERCITY_DISTANCE_KM,
+        )
 
     def set_status(self, new_status, user=None, comment="", location="", confirmation_type="", confirmation_value=""):
         if new_status not in dict(self.STATUS_CHOICES):
-            raise ValidationError("Неизвестный статус")
+            raise ValidationError("Неизвестный статус.")
         if new_status != self.status and new_status not in self.STATUS_FLOW.get(self.status, set()):
             raise ValidationError(
-                f"Нельзя изменить статус с '{self.get_status_display()}' на '{dict(self.STATUS_CHOICES)[new_status]}'"
+                f"Нельзя изменить статус с '{self.get_status_display()}' "
+                f"на '{dict(self.STATUS_CHOICES)[new_status]}'."
             )
+
         with transaction.atomic():
             self.status = new_status
             if confirmation_type:
@@ -293,10 +363,11 @@ class Order(models.Model):
                 user=user if getattr(user, "is_authenticated", False) else None,
                 order=self,
                 action="status_changed",
-                details=f"Статус изменен на {self.get_status_display()}. {comment}",
+                details=f"Статус изменен на {self.get_status_display()}. {comment}".strip(),
             )
 
     def cancel(self, user=None, comment=""):
+        cancellation_comment = comment or "Заказ отменен"
         with transaction.atomic():
             self.status = self.STATUS_CANCELLED
             self.save()
@@ -304,13 +375,13 @@ class Order(models.Model):
                 order=self,
                 status=self.STATUS_CANCELLED,
                 courier=user if getattr(user, "is_authenticated", False) else None,
-                comment=comment or "Р—Р°РєР°Р· РѕС‚РјРµРЅРµРЅ",
+                comment=cancellation_comment,
             )
             AuditLog.objects.create(
                 user=user if getattr(user, "is_authenticated", False) else None,
                 order=self,
                 action="order_cancelled",
-                details=comment or "Р—Р°РєР°Р· РѕС‚РјРµРЅРµРЅ",
+                details=cancellation_comment,
             )
 
 
@@ -442,79 +513,3 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%d.%m.%Y %H:%M} {self.action}"
-
-
-def _order_clean(self):
-    errors = {}
-    for field in ("pickup_city", "pickup_street", "pickup_house", "delivery_city"):
-        if not getattr(self, field):
-            errors[field] = "Обязательное поле"
-    if not self.delivery_to_pickup_point:
-        if not self.delivery_street:
-            errors["delivery_street"] = "Укажите улицу доставки"
-        if not self.delivery_house:
-            errors["delivery_house"] = "Укажите дом доставки"
-    for field in ("weight_kg", "length_cm", "width_cm", "height_cm"):
-        value = getattr(self, field)
-        if value is not None and value <= 0:
-            errors[field] = "Значение должно быть больше нуля"
-    if self.delivery_type_id:
-        distance_km = self.calculate_distance_km()
-        if distance_km > self.delivery_type.max_distance:
-            errors["delivery_type"] = (
-                f"Тип доставки не подходит: максимум {self.delivery_type.max_distance} км, "
-                f"а между городами {distance_km} км."
-            )
-    if errors:
-        raise ValidationError(errors)
-
-
-def _order_set_status(self, new_status, user=None, comment="", location="", confirmation_type="", confirmation_value=""):
-    if new_status not in dict(self.STATUS_CHOICES):
-        raise ValidationError("Неизвестный статус")
-    if new_status != self.status and new_status not in self.STATUS_FLOW.get(self.status, set()):
-        raise ValidationError(
-            f"Нельзя изменить статус с '{self.get_status_display()}' на '{dict(self.STATUS_CHOICES)[new_status]}'"
-        )
-    with transaction.atomic():
-        self.status = new_status
-        if confirmation_type:
-            self.confirmation_type = confirmation_type
-            self.confirmation_value = confirmation_value
-        self.save()
-        StatusHistory.objects.create(
-            order=self,
-            status=new_status,
-            courier=user if getattr(user, "is_authenticated", False) else None,
-            comment=comment,
-            location=location,
-        )
-        AuditLog.objects.create(
-            user=user if getattr(user, "is_authenticated", False) else None,
-            order=self,
-            action="status_changed",
-            details=f"Статус изменен на {self.get_status_display()}. {comment}",
-        )
-
-
-def _order_cancel(self, user=None, comment=""):
-    with transaction.atomic():
-        self.status = self.STATUS_CANCELLED
-        self.save()
-        StatusHistory.objects.create(
-            order=self,
-            status=self.STATUS_CANCELLED,
-            courier=user if getattr(user, "is_authenticated", False) else None,
-            comment=comment or "Заказ отменен",
-        )
-        AuditLog.objects.create(
-            user=user if getattr(user, "is_authenticated", False) else None,
-            order=self,
-            action="order_cancelled",
-            details=comment or "Заказ отменен",
-        )
-
-
-Order.clean = _order_clean
-Order.set_status = _order_set_status
-Order.cancel = _order_cancel

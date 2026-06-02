@@ -36,13 +36,11 @@
           <strong>{{ order.delivery_price }} ₽</strong>
         </div>
         <div class="mt-3">
-          {% if order.issues.all %}
-            {% for issue in order.issues.all %}
-              <div class="text-muted small">{{ issue.get_issue_type_display }}: {{ issue.description|truncatechars:80 }}</div>
-            {% endfor %}
-          {% else %}
-            <div class="text-muted small">Проблемы отсутствуют.</div>
-          {% endif %}
+          {% for issue in order.issues.all %}
+            <div class="text-muted small">{{ issue.get_issue_type_display }}: {{ issue.description|truncatechars:80 }}</div>
+          {% empty %}
+            <div class="text-muted small">Проблемные ситуации отсутствуют.</div>
+          {% endfor %}
         </div>
       </a>
 

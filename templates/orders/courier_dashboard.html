@@ -6,7 +6,7 @@
   <div>
     <div class="eyebrow">Курьер</div>
     <h1 class="hero-title">Мои активные задачи</h1>
-    <p class="hero-subtitle">Заказы, назначенные диспетчером.</p>
+    <p class="hero-subtitle">Здесь отображаются заказы, назначенные вам диспетчером.</p>
   </div>
 </div>
 
@@ -22,7 +22,10 @@
       </div>
     </a>
   {% empty %}
-    <div class="empty-state p-4"><h3>Задач нет</h3><p>Назначенные заказы появятся здесь.</p></div>
+    <div class="empty-state p-4">
+      <h3>Задач нет</h3>
+      <p>Назначенные заказы появятся здесь.</p>
+    </div>
   {% endfor %}
 </div>
 {% endblock %}
