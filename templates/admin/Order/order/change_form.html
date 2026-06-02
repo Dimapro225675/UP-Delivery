@@ -1,0 +1,180 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrahead %}
+  {{ block.super }}
+  {{ order_admin_delivery_types_json|json_script:"order-admin-delivery-types" }}
+  {{ order_admin_city_distances_json|json_script:"order-admin-city-distances" }}
+  {{ order_admin_pricing_config_json|json_script:"order-admin-pricing-config" }}
+  <script>
+    (function () {
+      function parseJsonScript(scriptId, fallback) {
+        const element = document.getElementById(scriptId);
+        if (!element) {
+          return fallback;
+        }
+        const value = element.textContent;
+        if (!value) {
+          return fallback;
+        }
+        try {
+          const parsed = JSON.parse(value);
+          if (typeof parsed === "string") {
+            try {
+              return JSON.parse(parsed);
+            } catch (error) {
+              return fallback;
+            }
+          }
+          return parsed;
+        } catch (error) {
+          return fallback;
+        }
+      }
+
+      function parseNumber(element) {
+        if (!element) {
+          return null;
+        }
+        const value = parseFloat(element.value || "");
+        return Number.isFinite(value) ? value : null;
+      }
+
+      function roundUp(value) {
+        return Math.ceil(value);
+      }
+
+      function updateAdminOrderSummary() {
+        const pickupCity = document.getElementById("id_pickup_city");
+        const deliveryCity = document.getElementById("id_delivery_city");
+        const deliveryType = document.getElementById("id_delivery_type");
+        const pickupPoint = document.getElementById("id_delivery_to_pickup_point");
+        const weight = document.getElementById("id_weight_kg");
+        const length = document.getElementById("id_length_cm");
+        const width = document.getElementById("id_width_cm");
+        const height = document.getElementById("id_height_cm");
+        const distanceField = document.getElementById("id_distance_km");
+        const priceField = document.getElementById("id_delivery_price");
+
+        if (!pickupCity || !deliveryCity || !deliveryType || !distanceField || !priceField) {
+          return;
+        }
+
+        const cityDistances = parseJsonScript("order-admin-city-distances", {});
+        const deliveryTypes = parseJsonScript("order-admin-delivery-types", []);
+        const pricingConfig = parseJsonScript("order-admin-pricing-config", {});
+
+        const deliveryTypeRow = deliveryType.closest(".form-row, .field-delivery_type, .form-group");
+        let hint = document.getElementById("admin-delivery-type-hint");
+        if (!hint && deliveryTypeRow) {
+          hint = document.createElement("div");
+          hint.id = "admin-delivery-type-hint";
+          hint.style.marginTop = "8px";
+          hint.style.padding = "10px 12px";
+          hint.style.border = "1px solid #d7e3d1";
+          hint.style.borderRadius = "10px";
+          hint.style.background = "#f7faf4";
+          hint.style.fontSize = "13px";
+          hint.style.lineHeight = "1.5";
+          deliveryTypeRow.appendChild(hint);
+        }
+
+        let distance = null;
+        if (pickupCity.value && deliveryCity.value) {
+          if (pickupCity.value === deliveryCity.value) {
+            distance = 0;
+          } else {
+            const key = [pickupCity.value, deliveryCity.value].sort().join(",");
+            distance = cityDistances[key] ?? 100;
+          }
+        }
+
+        distanceField.value = distance === null ? "" : String(distance);
+
+        const selectedType = deliveryTypes.find((item) => String(item.id) === String(deliveryType.value || ""));
+        if (hint) {
+          if (selectedType) {
+            hint.innerHTML = `<strong>Тип доставки:</strong> базовая цена ${Number(selectedType.base_price).toFixed(2)} ₽, максимум ${selectedType.max_distance} км.`;
+          } else {
+            hint.innerHTML = "Выберите тип доставки, чтобы увидеть базовую цену и максимальное расстояние.";
+          }
+        }
+
+        const currentWeight = parseNumber(weight);
+        const currentLength = parseNumber(length);
+        const currentWidth = parseNumber(width);
+        const currentHeight = parseNumber(height);
+
+        if (!selectedType || currentWeight === null || currentLength === null || currentWidth === null || currentHeight === null) {
+          priceField.value = "";
+          return;
+        }
+
+        let total = parseFloat(selectedType.base_price);
+        if (!pickupPoint || !pickupPoint.checked) {
+          total += pricingConfig.address_delivery_surcharge || 0;
+        }
+
+        if (currentWeight > (pricingConfig.included_weight_kg || 0)) {
+          total += (currentWeight - pricingConfig.included_weight_kg) * (pricingConfig.overweight_price_per_kg || 0);
+        }
+
+        [currentLength, currentWidth, currentHeight].forEach((side) => {
+          if (side > (pricingConfig.included_side_cm || 0)) {
+            total += roundUp((side - pricingConfig.included_side_cm) / 10) * (pricingConfig.oversize_price_per_10_cm || 0);
+          }
+        });
+
+        if (distance && distance > 0) {
+          total += roundUp(distance / 10) * (pricingConfig.intercity_price_per_10_km || 0);
+        }
+
+        priceField.value = total.toFixed(2);
+      }
+
+      function boot() {
+        const fieldIds = [
+          "id_pickup_city",
+          "id_delivery_city",
+          "id_delivery_type",
+          "id_delivery_to_pickup_point",
+          "id_weight_kg",
+          "id_length_cm",
+          "id_width_cm",
+          "id_height_cm",
+        ];
+
+        fieldIds.forEach((fieldId) => {
+          const field = document.getElementById(fieldId);
+          if (!field) {
+            return;
+          }
+          field.addEventListener("change", updateAdminOrderSummary);
+          field.addEventListener("input", updateAdminOrderSummary);
+        });
+
+        document.addEventListener("change", function (event) {
+          if (fieldIds.includes(event.target.id)) {
+            updateAdminOrderSummary();
+          }
+        });
+
+        document.addEventListener("input", function (event) {
+          if (fieldIds.includes(event.target.id)) {
+            updateAdminOrderSummary();
+          }
+        });
+
+        setTimeout(updateAdminOrderSummary, 0);
+        setTimeout(updateAdminOrderSummary, 150);
+        window.addEventListener("load", updateAdminOrderSummary);
+        updateAdminOrderSummary();
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
+      }
+    })();
+  </script>
+{% endblock %}

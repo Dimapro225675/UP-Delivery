@@ -44,7 +44,7 @@
         <div class="form-grid form-grid--two">
           {% for field in form %}
             {% if field.name == 'delivery_type' or field.name == 'weight_kg' or field.name == 'length_cm' or field.name == 'width_cm' or field.name == 'height_cm' or field.name == 'order_photos' or field.name == 'description' %}
-              <div class="form-field{% if field.name == 'description' or field.name == 'order_photos' %} form-field--full{% endif %}">
+              <div class="form-field{% if field.name == 'description' or field.name == 'order_photos' or field.name == 'delivery_type' %} form-field--full{% endif %}">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {% if field.field.widget.input_type == 'file' %}
                   <div class="image-upload" data-multi-upload>
@@ -68,25 +68,73 @@
                 {% else %}
                   {{ field }}
                 {% endif %}
+
+                {% if field.name == 'delivery_type' %}
+                  <div class="delivery-type-hint" data-delivery-type-hint>
+                    <div class="delivery-type-hint__row">
+                      <span>Базовая цена:</span>
+                      <strong data-delivery-base-price>Выберите тип доставки</strong>
+                    </div>
+                    <div class="delivery-type-hint__row">
+                      <span>Максимальное расстояние:</span>
+                      <strong data-delivery-max-distance>Выберите тип доставки</strong>
+                    </div>
+                    <div class="delivery-type-hint__row">
+                      <span>Расстояние между городами:</span>
+                      <strong data-order-distance>Заполните маршрут</strong>
+                    </div>
+                    <div class="delivery-type-hint__error" data-delivery-type-error hidden></div>
+                  </div>
+                {% endif %}
+
                 {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
                 {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
               </div>
             {% endif %}
           {% endfor %}
         </div>
+
+        <div class="order-price-summary" data-order-price-summary>
+          <div class="card-kicker">Стоимость заказа</div>
+          <h3 class="card-title" data-order-price-value>Заполните тип доставки, вес и габариты</h3>
+          <p class="order-price-summary__text" data-order-price-description>
+            После заполнения основных параметров здесь появится итоговая стоимость заказа.
+          </p>
+        </div>
       </section>
     </div>
 
     <div class="form-actions">
-      <button class="btn btn-primary btn-lg rounded-pill px-4">Сохранить</button>
+      <button class="btn btn-primary btn-lg rounded-pill px-4" data-order-submit>Сохранить</button>
       <a href="javascript:history.back()" class="btn btn-outline-secondary btn-lg rounded-pill px-4">Отмена</a>
     </div>
   </form>
 </div>
+
+{{ delivery_type_data|json_script:"delivery-type-data" }}
+{{ delivery_pricing|json_script:"delivery-pricing-data" }}
+
 <script>
   const pickupPoint = document.getElementById('id_delivery_to_pickup_point');
   const street = document.getElementById('id_delivery_street');
   const house = document.getElementById('id_delivery_house');
+  const pickupCity = document.getElementById('id_pickup_city');
+  const deliveryCity = document.getElementById('id_delivery_city');
+  const deliveryType = document.getElementById('id_delivery_type');
+  const weight = document.getElementById('id_weight_kg');
+  const lengthField = document.getElementById('id_length_cm');
+  const widthField = document.getElementById('id_width_cm');
+  const heightField = document.getElementById('id_height_cm');
+  const priceValue = document.querySelector('[data-order-price-value]');
+  const priceDescription = document.querySelector('[data-order-price-description]');
+  const basePriceField = document.querySelector('[data-delivery-base-price]');
+  const maxDistanceField = document.querySelector('[data-delivery-max-distance]');
+  const distanceField = document.querySelector('[data-order-distance]');
+  const deliveryTypeError = document.querySelector('[data-delivery-type-error]');
+  const submitButton = document.querySelector('[data-order-submit]');
+
+  const deliveryTypes = JSON.parse(document.getElementById('delivery-type-data').textContent);
+  const deliveryPricing = JSON.parse(document.getElementById('delivery-pricing-data').textContent);
 
   function toggleDeliveryAddress() {
     const disabled = pickupPoint && pickupPoint.checked;
@@ -94,10 +142,103 @@
     if (house) house.disabled = disabled;
   }
 
+  function parseNumber(element) {
+    const value = parseFloat(element?.value || '');
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function calculateDistance() {
+    if (!pickupCity?.value || !deliveryCity?.value) {
+      return null;
+    }
+    if (pickupCity.value === deliveryCity.value) {
+      return 0;
+    }
+    const key = [pickupCity.value, deliveryCity.value].sort().join(',');
+    return deliveryPricing.city_distances_km[key] ?? 100;
+  }
+
+  function formatCurrency(value) {
+    return `${value.toFixed(2)} ₽`;
+  }
+
+  function roundUp(value) {
+    return Math.ceil(value);
+  }
+
+  function updateDeliverySummary() {
+    const selectedType = deliveryTypes.find((item) => String(item.id) === String(deliveryType?.value || ''));
+    const distance = calculateDistance();
+    const currentWeight = parseNumber(weight);
+    const currentLength = parseNumber(lengthField);
+    const currentWidth = parseNumber(widthField);
+    const currentHeight = parseNumber(heightField);
+
+    if (selectedType) {
+      basePriceField.textContent = `${selectedType.base_price} ₽`;
+      maxDistanceField.textContent = `${selectedType.max_distance} км`;
+    } else {
+      basePriceField.textContent = 'Выберите тип доставки';
+      maxDistanceField.textContent = 'Выберите тип доставки';
+    }
+
+    distanceField.textContent = distance === null ? 'Заполните маршрут' : `${distance} км`;
+
+    let hasValidationError = false;
+    if (selectedType && distance !== null && distance > selectedType.max_distance) {
+      deliveryTypeError.hidden = false;
+      deliveryTypeError.textContent = `Тип доставки не подходит: максимум ${selectedType.max_distance} км, а между городами ${distance} км.`;
+      hasValidationError = true;
+    } else {
+      deliveryTypeError.hidden = true;
+      deliveryTypeError.textContent = '';
+    }
+
+    const hasMainData = selectedType && currentWeight && currentLength && currentWidth && currentHeight;
+    if (!hasMainData) {
+      priceValue.textContent = 'Заполните тип доставки, вес и габариты';
+      priceDescription.textContent = 'После заполнения основных параметров здесь появится итоговая стоимость заказа.';
+      if (submitButton) submitButton.disabled = hasValidationError;
+      return;
+    }
+
+    let total = parseFloat(selectedType.base_price);
+    if (!pickupPoint?.checked) {
+      total += deliveryPricing.address_delivery_surcharge;
+    }
+    if (currentWeight > deliveryPricing.included_weight_kg) {
+      total += (currentWeight - deliveryPricing.included_weight_kg) * deliveryPricing.overweight_price_per_kg;
+    }
+
+    [currentLength, currentWidth, currentHeight].forEach((side) => {
+      if (side > deliveryPricing.included_side_cm) {
+        total += roundUp((side - deliveryPricing.included_side_cm) / 10) * deliveryPricing.oversize_price_per_10_cm;
+      }
+    });
+
+    if (distance && distance > 0) {
+      total += roundUp(distance / 10) * deliveryPricing.intercity_price_per_10_km;
+    }
+
+    priceValue.textContent = formatCurrency(total);
+    priceDescription.textContent = hasValidationError
+      ? 'Исправьте тип доставки: его максимальное расстояние меньше расстояния между городами.'
+      : 'Итоговая стоимость рассчитана по выбранному типу доставки, весу и габаритам.';
+    if (submitButton) submitButton.disabled = hasValidationError;
+  }
+
   if (pickupPoint) {
-    pickupPoint.addEventListener('change', toggleDeliveryAddress);
+    pickupPoint.addEventListener('change', () => {
+      toggleDeliveryAddress();
+      updateDeliverySummary();
+    });
     toggleDeliveryAddress();
   }
+
+  [pickupCity, deliveryCity, deliveryType, weight, lengthField, widthField, heightField].forEach((field) => {
+    field?.addEventListener('input', updateDeliverySummary);
+    field?.addEventListener('change', updateDeliverySummary);
+  });
 
   (function () {
     const uploads = document.querySelectorAll('[data-multi-upload]');
@@ -161,5 +302,7 @@
       refreshState();
     });
   })();
+
+  updateDeliverySummary();
 </script>
 {% endblock %}

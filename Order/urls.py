@@ -4,8 +4,9 @@ from . import views
 app_name = 'Order'
 
 urlpatterns = [
-    path('orders/', views.OrderListView.as_view(), name='order_list'),
+    path('orders/', views.OrderListRedirectView.as_view(), name='order_list'),
     path('orders/history/', views.ClientHistoryView.as_view(), name='client_history'),
+    path('orders/history/<int:order_id>/hide/', views.hide_order_from_history, name='hide_order_from_history'),
     path('orders/dispatcher/', views.DispatcherDashboardView.as_view(), name='dispatcher_dashboard'),
     path('orders/courier/', views.CourierDashboardView.as_view(), name='courier_dashboard'),
     path('orders/<int:pk>/', views.OrderDetailView.as_view(), name='order_detail'),
@@ -13,6 +14,7 @@ urlpatterns = [
     path('orders/<int:pk>/update/', views.OrderUpdateView.as_view(), name='order_update'),
     path('orders/<int:pk>/delete/', views.OrderDeleteView.as_view(), name='order_delete'),
     path('orders/<int:order_id>/assign/', views.assign_courier, name='assign_courier'),
+    path('orders/<int:order_id>/refuse/', views.refuse_order, name='refuse_order'),
     path('orders/<int:order_id>/add-status/', views.add_status_history, name='add_status'),
     path('orders/<int:order_id>/confirm/', views.confirm_delivery, name='confirm_delivery'),
     path('scan/', views.scan_tracking, name='scan_tracking'),
@@ -20,4 +22,5 @@ urlpatterns = [
 
     path('orders/<int:order_id>/issues/create/', views.IssueCreateView.as_view(), name='issue_create'),
     path('issues/<int:pk>/update/', views.IssueUpdateView.as_view(), name='issue_update'),
+    path('issues/<int:pk>/delete/', views.IssueDeleteView.as_view(), name='issue_delete'),
 ]

@@ -25,15 +25,20 @@
       <nav class="sidebar-nav">
         <a href="{% url 'home' %}">Главная</a>
         <a href="{% url 'Order:public_tracking' %}">Поиск по треку</a>
-        {% if user.is_authenticated and user.is_courier %}
+        {% if user.is_authenticated and user.can_view_all_client_pages %}
+          <a href="{% url 'Order:order_create' %}">Создать заказ</a>
+          <a href="{% url 'Order:client_history' %}">Личный кабинет</a>
+          <a href="{% url 'Order:courier_dashboard' %}">Кабинет курьера</a>
+          <a href="{% url 'Order:dispatcher_dashboard' %}">Кабинет диспетчера</a>
+          <a href="{% url 'Order:scan_tracking' %}">Сканирование</a>
+        {% elif user.is_authenticated and user.is_courier %}
           <a href="{% url 'Order:courier_dashboard' %}">Кабинет курьера</a>
           <a href="{% url 'Order:scan_tracking' %}">Сканирование</a>
-        {% endif %}
-        {% if user.is_authenticated and user.can_manage_orders %}
+        {% elif user.is_authenticated and user.can_manage_orders %}
           <a href="{% url 'Order:dispatcher_dashboard' %}">Кабинет диспетчера</a>
           <a href="{% url 'Order:scan_tracking' %}">Сканирование</a>
         {% endif %}
-        {% if user.is_authenticated %}
+        {% if user.is_authenticated and not user.can_view_all_client_pages %}
           <a href="{% url 'Order:client_history' %}">Личный кабинет</a>
         {% endif %}
         {% if user.is_authenticated %}
@@ -64,45 +69,15 @@
         <div class="footer-col">
           <div class="footer-title">Дополнительно</div>
           <ul class="footer-links">
-            <li><a href="#">Контакты</a></li>
-            <li><a href="#">Тендеры</a></li>
-            <li><a href="#">Горячая линия безопасности</a></li>
-            <li><a href="#">Пресс-центр</a></li>
-            <li><a href="#">Карьера</a></li>
-            <li><a href="#">Инвесторам</a></li>
-            <li><a href="#">Справка</a></li>
-            <li><a href="#">Карта сайта</a></li>
-            <li><a href="#">Реклама в экосистеме</a></li>
+            <li><a href="{% url 'Order:client_history' %}">Личный кабинет</a></li>
+            <li><a href="{% url 'Order:order_create' %}">Создать заказ</a></li>
           </ul>
         </div>
-
-        <div class="footer-col">
-          <div class="footer-title">Соглашения</div>
-          <ul class="footer-links">
-            <li><a href="#">Правила приема и доставки</a></li>
-            <li><a href="#">Оферта</a></li>
-            <li><a href="#">Политика сбора ПДН клиентов</a></li>
-            <li><a href="#">Пользовательское соглашение</a></li>
-            <li><a href="#">Политика экспортного контроля</a></li>
-          </ul>
-        </div>
-
         <div class="footer-col footer-support">
           <div class="footer-title">Поддержка</div>
-          <ul class="footer-links footer-links--support">
-            <li><a href="#">Частые вопросы</a></li>
-          </ul>
-
-          <a class="footer-chat" href="#">
-            <span class="footer-chat__icon">💬</span>
-            <span>Написать в чат</span>
-          </a>
-
-          <div class="footer-phone">+7 (495) 009 04 05</div>
+          <div class="footer-phone">+8 (951) 030 63 98</div>
           <div class="footer-hours">Пн-Пт с 5:00 до 22:00 по МСК</div>
-
-          <a class="footer-location" href="#">📍 Москва</a>
-          <a class="footer-feedback" href="#">★ Оставить отзыв</a>
+          <a class="footer-location" href="#">Москва</a>
         </div>
       </div>
     </div>

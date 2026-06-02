@@ -54,16 +54,29 @@ class Order(models.Model):
 
     CITY_CHOICES = [
         ("moscow", "Москва"),
+        ("tver", "Тверь"),
+        ("kaluga", "Калуга"),
         ("spb", "Санкт-Петербург"),
         ("kazan", "Казань"),
         ("nizhny", "Нижний Новгород"),
         ("ekb", "Екатеринбург"),
     ]
     CITY_DISTANCES_KM = {
+        frozenset(("moscow", "tver")): 140,
+        frozenset(("moscow", "kaluga")): 145,
         frozenset(("moscow", "spb")): 710,
         frozenset(("moscow", "kazan")): 820,
         frozenset(("moscow", "nizhny")): 420,
         frozenset(("moscow", "ekb")): 1800,
+        frozenset(("tver", "kaluga")): 270,
+        frozenset(("tver", "spb")): 540,
+        frozenset(("tver", "kazan")): 960,
+        frozenset(("tver", "nizhny")): 500,
+        frozenset(("tver", "ekb")): 1870,
+        frozenset(("kaluga", "spb")): 830,
+        frozenset(("kaluga", "kazan")): 930,
+        frozenset(("kaluga", "nizhny")): 470,
+        frozenset(("kaluga", "ekb")): 1750,
         frozenset(("spb", "kazan")): 1500,
         frozenset(("spb", "nizhny")): 1100,
         frozenset(("spb", "ekb")): 2300,
@@ -184,6 +197,12 @@ class Order(models.Model):
     def primary_delivery_report_photo(self):
         return self.delivery_report_photos.first()
 
+    @property
+    def estimated_delivery_window(self):
+        if self.distance_km < 150:
+            return "В течение дня"
+        return "В течение недели"
+
     def clean(self):
         errors = {}
         for field in ("pickup_city", "pickup_street", "pickup_house", "delivery_city"):
@@ -198,6 +217,13 @@ class Order(models.Model):
             value = getattr(self, field)
             if value is not None and value <= 0:
                 errors[field] = "Значение должно быть больше нуля"
+        if self.delivery_type_id:
+            distance_km = self.calculate_distance_km()
+            if distance_km > self.delivery_type.max_distance:
+                errors["delivery_type"] = (
+                    f"РўРёРї РґРѕСЃС‚Р°РІРєРё РЅРµ РїРѕРґС…РѕРґРёС‚: РјР°РєСЃРёРјСѓРј {self.delivery_type.max_distance} РєРј, "
+                    f"Р° РјРµР¶РґСѓ РіРѕСЂРѕРґР°РјРё {distance_km} РєРј."
+                )
         if errors:
             raise ValidationError(errors)
 
@@ -270,6 +296,23 @@ class Order(models.Model):
                 details=f"Статус изменен на {self.get_status_display()}. {comment}",
             )
 
+    def cancel(self, user=None, comment=""):
+        with transaction.atomic():
+            self.status = self.STATUS_CANCELLED
+            self.save()
+            StatusHistory.objects.create(
+                order=self,
+                status=self.STATUS_CANCELLED,
+                courier=user if getattr(user, "is_authenticated", False) else None,
+                comment=comment or "Р—Р°РєР°Р· РѕС‚РјРµРЅРµРЅ",
+            )
+            AuditLog.objects.create(
+                user=user if getattr(user, "is_authenticated", False) else None,
+                order=self,
+                action="order_cancelled",
+                details=comment or "Р—Р°РєР°Р· РѕС‚РјРµРЅРµРЅ",
+            )
+
 
 class OrderPhoto(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="order_photos", verbose_name="Заказ")
@@ -297,6 +340,32 @@ class DeliveryReportPhoto(models.Model):
 
     def __str__(self):
         return f"{self.order.tracking_number}: отчет {self.pk}"
+
+
+class OrderHistoryHiddenEntry(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="hidden_order_history_entries",
+        verbose_name="Пользователь",
+    )
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="hidden_in_history_entries",
+        verbose_name="Заказ",
+    )
+    created_at = models.DateTimeField("Скрыт", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Скрытая запись истории"
+        verbose_name_plural = "Скрытые записи истории"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "order"], name="unique_hidden_order_history_entry"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} скрыл {self.order.tracking_number}"
 
 
 class StatusHistory(models.Model):
@@ -373,3 +442,79 @@ class AuditLog(models.Model):
 
     def __str__(self):
         return f"{self.created_at:%d.%m.%Y %H:%M} {self.action}"
+
+
+def _order_clean(self):
+    errors = {}
+    for field in ("pickup_city", "pickup_street", "pickup_house", "delivery_city"):
+        if not getattr(self, field):
+            errors[field] = "Обязательное поле"
+    if not self.delivery_to_pickup_point:
+        if not self.delivery_street:
+            errors["delivery_street"] = "Укажите улицу доставки"
+        if not self.delivery_house:
+            errors["delivery_house"] = "Укажите дом доставки"
+    for field in ("weight_kg", "length_cm", "width_cm", "height_cm"):
+        value = getattr(self, field)
+        if value is not None and value <= 0:
+            errors[field] = "Значение должно быть больше нуля"
+    if self.delivery_type_id:
+        distance_km = self.calculate_distance_km()
+        if distance_km > self.delivery_type.max_distance:
+            errors["delivery_type"] = (
+                f"Тип доставки не подходит: максимум {self.delivery_type.max_distance} км, "
+                f"а между городами {distance_km} км."
+            )
+    if errors:
+        raise ValidationError(errors)
+
+
+def _order_set_status(self, new_status, user=None, comment="", location="", confirmation_type="", confirmation_value=""):
+    if new_status not in dict(self.STATUS_CHOICES):
+        raise ValidationError("Неизвестный статус")
+    if new_status != self.status and new_status not in self.STATUS_FLOW.get(self.status, set()):
+        raise ValidationError(
+            f"Нельзя изменить статус с '{self.get_status_display()}' на '{dict(self.STATUS_CHOICES)[new_status]}'"
+        )
+    with transaction.atomic():
+        self.status = new_status
+        if confirmation_type:
+            self.confirmation_type = confirmation_type
+            self.confirmation_value = confirmation_value
+        self.save()
+        StatusHistory.objects.create(
+            order=self,
+            status=new_status,
+            courier=user if getattr(user, "is_authenticated", False) else None,
+            comment=comment,
+            location=location,
+        )
+        AuditLog.objects.create(
+            user=user if getattr(user, "is_authenticated", False) else None,
+            order=self,
+            action="status_changed",
+            details=f"Статус изменен на {self.get_status_display()}. {comment}",
+        )
+
+
+def _order_cancel(self, user=None, comment=""):
+    with transaction.atomic():
+        self.status = self.STATUS_CANCELLED
+        self.save()
+        StatusHistory.objects.create(
+            order=self,
+            status=self.STATUS_CANCELLED,
+            courier=user if getattr(user, "is_authenticated", False) else None,
+            comment=comment or "Заказ отменен",
+        )
+        AuditLog.objects.create(
+            user=user if getattr(user, "is_authenticated", False) else None,
+            order=self,
+            action="order_cancelled",
+            details=comment or "Заказ отменен",
+        )
+
+
+Order.clean = _order_clean
+Order.set_status = _order_set_status
+Order.cancel = _order_cancel

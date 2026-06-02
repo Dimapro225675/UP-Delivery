@@ -40,5 +40,17 @@ class CustomUser(AbstractUser):
     def can_manage_orders(self):
         return self.is_dispatcher or self.is_business_admin
 
+    @property
+    def can_access_admin_panel(self):
+        return self.is_superuser or self.role in {self.ROLE_DISPATCHER, self.ROLE_ADMIN}
+
+    @property
+    def can_view_all_client_pages(self):
+        return self.is_superuser or self.role == self.ROLE_ADMIN
+
+    def save(self, *args, **kwargs):
+        self.is_staff = self.can_access_admin_panel
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.full_name or self.username
