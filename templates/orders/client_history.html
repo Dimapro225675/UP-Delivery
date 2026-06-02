@@ -5,37 +5,59 @@
 <div class="hero-panel mb-4">
   <div>
     <div class="eyebrow">Личный кабинет</div>
-    <h1 class="hero-title">Мои заказы</h1>
-    <p class="hero-subtitle">Статусы, маршрут, стоимость и проблемы по заказам.</p>
+    <h1 class="hero-title">{{ cabinet_title }}</h1>
+    <p class="hero-subtitle">{{ cabinet_subtitle }}</p>
   </div>
 </div>
 
-<div class="grid-cards">
+<section class="profile-card mb-4">
+  <div class="card-kicker">Профиль</div>
+  <h3 class="card-title profile-card__name">{{ request.user.full_name|default:request.user.username }}</h3>
+  <div class="profile-card__details">
+    <div class="profile-card__item"><span>Логин:</span> <strong>{{ request.user.username }}</strong></div>
+    <div class="profile-card__item"><span>Email:</span> <strong>{{ request.user.email|default:"Не указан" }}</strong></div>
+    <div class="profile-card__item"><span>Номер телефона:</span> <strong>{{ request.user.phone|default:"Не указан" }}</strong></div>
+  </div>
+</section>
+
+<div class="grid-cards profile-orders-grid">
   {% for order in orders %}
-    <a href="{% url 'Order:order_detail' order.pk %}" class="order-card">
-      <div class="card-kicker">{{ order.tracking_number }}</div>
-      <h3 class="card-title">{{ order.get_status_display }}</h3>
-      <div class="route-block">
-        <div class="route-item"><span class="route-label">Забор</span><span class="route-value">{{ order.pickup_address }}</span></div>
-        <div class="route-line"></div>
-        <div class="route-item"><span class="route-label">Доставка</span><span class="route-value">{{ order.delivery_address }}</span></div>
-      </div>
-      <div class="meta-row mt-3">
-        <span>{{ order.delivery_type.name }}</span>
-        <strong>{{ order.delivery_price }} ₽</strong>
-      </div>
-      <div class="mt-3">
-        {% if order.issues.all %}
-          {% for issue in order.issues.all %}
-            <div class="text-muted small">{{ issue.get_issue_type_display }}: {{ issue.description|truncatechars:80 }}</div>
-          {% endfor %}
-        {% else %}
-          <div class="text-muted small">Проблемы отсутствуют.</div>
-        {% endif %}
-      </div>
-    </a>
+    <article class="order-card order-card--history">
+      <a href="{% url 'Order:order_detail' order.pk %}" class="order-card__link">
+        <div class="card-kicker">{{ order.tracking_number }}</div>
+        <h3 class="card-title">{{ order.get_status_display }}</h3>
+        <div class="route-block">
+          <div class="route-item"><span class="route-label">Забор</span><span class="route-value">{{ order.pickup_address }}</span></div>
+          <div class="route-line"></div>
+          <div class="route-item"><span class="route-label">Доставка</span><span class="route-value">{{ order.delivery_address }}</span></div>
+        </div>
+        <div class="meta-row mt-3">
+          <span>{{ order.delivery_type.name }}</span>
+          <strong>{{ order.delivery_price }} ₽</strong>
+        </div>
+        <div class="mt-3">
+          {% if order.issues.all %}
+            {% for issue in order.issues.all %}
+              <div class="text-muted small">{{ issue.get_issue_type_display }}: {{ issue.description|truncatechars:80 }}</div>
+            {% endfor %}
+          {% else %}
+            <div class="text-muted small">Проблемы отсутствуют.</div>
+          {% endif %}
+        </div>
+      </a>
+
+      {% if order.status == 'delivered_pickup_point' or order.status == 'delivered_address' or order.status == 'confirmed' or order.status == 'returned' or order.status == 'cancelled' %}
+        <form method="post" action="{% url 'Order:hide_order_from_history' order.pk %}" class="order-card__actions">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-secondary rounded-pill">Скрыть из истории</button>
+        </form>
+      {% endif %}
+    </article>
   {% empty %}
-    <div class="empty-state p-4"><h3>Заказов нет</h3><p>Созданные заказы появятся здесь.</p></div>
+    <div class="empty-state profile-empty-state p-4">
+      <h3>Заказов нет</h3>
+      <p>Созданные пользователем заказы появятся здесь.</p>
+    </div>
   {% endfor %}
 </div>
 {% endblock %}

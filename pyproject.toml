@@ -8,8 +8,12 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "psycopg[binary] (>=3.3.4,<4.0.0)",
-    "django (==6.0.4)"
+    "django (==6.0.4)",
+    "faker (>=37.3.0,<38.0.0)"
 ]
+
+[tool.poetry]
+package-mode = false
 
 
 [build-system]
