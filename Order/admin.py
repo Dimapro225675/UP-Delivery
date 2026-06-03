@@ -1,5 +1,3 @@
-import json
-
 from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -23,8 +21,18 @@ class MultipleAdminFileInput(forms.ClearableFileInput):
     allow_multiple_selected = True
 
 
+class MultipleAdminFileField(forms.FileField):
+    widget = MultipleAdminFileInput
+
+    def clean(self, data, initial=None):
+        single_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            return [single_clean(item, initial) for item in data]
+        return single_clean(data, initial)
+
+
 class ClientAlphabetFilter(admin.SimpleListFilter):
-    title = "Клиент (алфавит)"
+    title = "Клиент"
     parameter_name = "client_initial"
 
     def lookups(self, request, model_admin):
@@ -64,13 +72,13 @@ class DeliveryReportPhotoInline(admin.TabularInline):
 
 
 class OrderAdminForm(forms.ModelForm):
-    order_photos_upload = forms.FileField(
+    order_photos_upload = MultipleAdminFileField(
         label="Фотографии заказа",
         required=False,
         widget=MultipleAdminFileInput(attrs={"accept": "image/*"}),
         help_text="Можно выбрать сразу несколько фотографий заказа.",
     )
-    delivery_report_photos_upload = forms.FileField(
+    delivery_report_photos_upload = MultipleAdminFileField(
         label="Фотографии доставки",
         required=False,
         widget=MultipleAdminFileInput(attrs={"accept": "image/*"}),
@@ -84,39 +92,49 @@ class OrderAdminForm(forms.ModelForm):
     class Media:
         js = ("admin/js/order_admin.js",)
 
+    field_labels = {
+        "tracking_number": "Трекинг-номер",
+        "client": "Клиент",
+        "courier": "Курьер",
+        "status": "Статус",
+        "delivery_type": "Тип доставки",
+        "pickup_city": "Город забора",
+        "pickup_street": "Улица забора",
+        "pickup_house": "Дом забора",
+        "delivery_to_pickup_point": "Доставка на пункт выдачи",
+        "delivery_city": "Город доставки",
+        "delivery_street": "Улица доставки",
+        "delivery_house": "Дом доставки",
+        "distance_km": "Расстояние, км",
+        "weight_kg": "Вес, кг",
+        "length_cm": "Длина, см",
+        "width_cm": "Ширина, см",
+        "height_cm": "Высота, см",
+        "delivery_price": "Стоимость доставки",
+        "description": "Комментарий",
+        "delivered_at": "Дата вручения",
+        "client_confirmed_at": "Подтвержден клиентом",
+        "created_at": "Создан",
+        "updated_at": "Обновлен",
+    }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user_model = get_user_model()
         self.fields["courier"].queryset = user_model.objects.filter(role=user_model.ROLE_COURIER).order_by("username")
+
+        for field_name, label in self.field_labels.items():
+            if field_name in self.fields:
+                self.fields[field_name].label = label
 
         self.fields["distance_km"].disabled = True
         self.fields["delivery_price"].disabled = True
         self.fields["distance_km"].help_text = "Рассчитывается автоматически по выбранным городам."
         self.fields["delivery_price"].help_text = "Рассчитывается автоматически по типу доставки, маршруту и габаритам."
 
-        delivery_types = [
-            {
-                "id": delivery_type.id,
-                "name": delivery_type.name,
-                "base_price": float(delivery_type.base_price),
-                "max_distance": delivery_type.max_distance,
-            }
-            for delivery_type in DeliveryType.objects.order_by("name")
-        ]
-        city_distances = {",".join(sorted(key)): value for key, value in Order.CITY_DISTANCES_KM.items()}
-        pricing_config = {
-            "included_weight_kg": float(Order.INCLUDED_WEIGHT_KG),
-            "included_side_cm": float(Order.INCLUDED_SIDE_CM),
-            "address_delivery_surcharge": float(Order.ADDRESS_DELIVERY_SURCHARGE),
-            "overweight_price_per_kg": float(Order.OVERWEIGHT_PRICE_PER_KG),
-            "oversize_price_per_10_cm": float(Order.OVERSIZE_PRICE_PER_10_CM),
-            "intercity_price_per_10_km": float(Order.INTERCITY_PRICE_PER_10_KM),
-            "city_distances_km": city_distances,
-        }
-
-        self.delivery_types_data = delivery_types
-        self.city_distances_data = city_distances
-        self.pricing_config_data = pricing_config
+        self.delivery_types_data = Order.delivery_type_payload()
+        self.city_distances_data = Order.city_distances_payload()
+        self.pricing_config_data = Order.delivery_pricing_payload()
 
         instance = getattr(self, "instance", None)
         if instance and instance.pk:
@@ -139,16 +157,38 @@ class OrderAdmin(AdminWorkspaceMixin, admin.ModelAdmin):
     readonly_fields = ["tracking_number", "created_at", "updated_at", "delivered_at"]
     inlines = [OrderPhotoInline, DeliveryReportPhotoInline, StatusHistoryInline, IssueInline]
     ordering = ["status", "client__username", "tracking_number"]
-
-    fieldsets = (
+    base_fieldsets = (
         ("Основная информация", {"fields": ("tracking_number", "client", "courier", "status", "delivery_type")}),
-        ("Маршрут", {"fields": ("pickup_city", "pickup_street", "pickup_house", "delivery_to_pickup_point", "delivery_city", "delivery_street", "delivery_house", "distance_km")}),
+        (
+            "Маршрут",
+            {
+                "fields": (
+                    "pickup_city",
+                    "pickup_street",
+                    "pickup_house",
+                    "delivery_to_pickup_point",
+                    "delivery_city",
+                    "delivery_street",
+                    "delivery_house",
+                    "distance_km",
+                )
+            },
+        ),
         ("Груз", {"fields": ("weight_kg", "length_cm", "width_cm", "height_cm")}),
         ("Стоимость", {"fields": ("delivery_price",)}),
         ("Фотографии", {"fields": ("order_photos_upload", "delivery_report_photos_upload")}),
         ("Вручение", {"fields": ("delivered_at", "client_confirmed_at")}),
         ("Служебное", {"fields": ("description", "created_at", "updated_at")}),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = []
+        for title, options in self.base_fieldsets:
+            fields = list(options.get("fields", ()))
+            if obj is None and "delivery_report_photos_upload" in fields:
+                fields.remove("delivery_report_photos_upload")
+            fieldsets.append((title, {**options, "fields": tuple(fields)}))
+        return tuple(fieldsets)
 
     def render_change_form(self, request, context, *args, **kwargs):
         admin_form = context.get("adminform")
@@ -160,11 +200,11 @@ class OrderAdmin(AdminWorkspaceMixin, admin.ModelAdmin):
         return super().render_change_form(request, context, *args, **kwargs)
 
     def save_model(self, request, obj, form, change):
-        if obj.courier_id:
-            if obj.status == Order.STATUS_WAITING:
-                obj.status = Order.STATUS_WAITING_COURIER
-        elif obj.status == Order.STATUS_WAITING_COURIER:
+        if obj.courier_id and obj.status == Order.STATUS_WAITING:
+            obj.status = Order.STATUS_WAITING_COURIER
+        elif not obj.courier_id and obj.status == Order.STATUS_WAITING_COURIER:
             obj.status = Order.STATUS_WAITING
+
         super().save_model(request, obj, form, change)
 
         for image in request.FILES.getlist("order_photos_upload"):

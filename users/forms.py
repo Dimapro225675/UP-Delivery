@@ -29,23 +29,23 @@ class RegisterForm(StyledFieldsMixin, UserCreationForm):
     def clean_username(self):
         username = self.cleaned_data.get("username")
         if not re.fullmatch(r"[A-Za-z0-9]+", username):
-            raise ValidationError("Логин должен содержать только латинские буквы и цифры")
+            raise ValidationError("Логин должен содержать только латинские буквы и цифры.")
         if CustomUser.objects.filter(username=username).exists():
-            raise ValidationError("Пользователь с таким логином уже существует")
+            raise ValidationError("Пользователь с таким логином уже существует.")
         return username
 
     def clean_full_name(self):
         full_name = self.cleaned_data.get("full_name")
         if not re.fullmatch(r"[А-Яа-яЁё\s]+", full_name):
-            raise ValidationError("ФИО должно содержать только кириллицу и пробелы")
+            raise ValidationError("ФИО должно содержать только кириллицу и пробелы.")
         return full_name
 
     def clean_phone(self):
         phone = self.cleaned_data.get("phone")
         if not re.fullmatch(r"8\(\d{3}\)\d{3}-\d{2}-\d{2}", phone):
-            raise ValidationError("Телефон должен быть в формате 8(XXX)XXX-XX-XX")
+            raise ValidationError("Телефон должен быть в формате 8(XXX)XXX-XX-XX.")
         if CustomUser.objects.filter(phone=phone).exists():
-            raise ValidationError("Пользователь с таким телефоном уже существует")
+            raise ValidationError("Пользователь с таким телефоном уже существует.")
         return phone
 
 

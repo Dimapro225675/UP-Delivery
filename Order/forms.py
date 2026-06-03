@@ -12,6 +12,7 @@ class MultipleFileInput(forms.ClearableFileInput):
 
 class MultipleFileField(forms.FileField):
     widget = MultipleFileInput
+    max_dimension_px = 550
 
     def clean(self, data, initial=None):
         single_clean = super().clean
@@ -23,13 +24,14 @@ class MultipleFileField(forms.FileField):
         self.validate_dimensions([cleaned_file] if cleaned_file else [])
         return cleaned_file
 
-    @staticmethod
-    def validate_dimensions(files):
+    def validate_dimensions(self, files):
         for uploaded_file in files:
             width, height = get_image_dimensions(uploaded_file)
             uploaded_file.seek(0)
-            if width > 550 or height > 550:
-                raise ValidationError("Изображение должно быть не больше 550x550 пикселей.")
+            if width > self.max_dimension_px or height > self.max_dimension_px:
+                raise ValidationError(
+                    f"Изображение должно быть не больше {self.max_dimension_px}x{self.max_dimension_px} пикселей."
+                )
 
 
 class BootstrapFormMixin:
@@ -58,12 +60,13 @@ class BootstrapFormMixin:
 class DeliveryTypeForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = DeliveryType
-        fields = [
-            "name",
-            "description",
-            "max_distance",
-            "base_price",
-        ]
+        fields = ["name", "description", "max_distance", "base_price"]
+        labels = {
+            "name": "Название",
+            "description": "Описание",
+            "max_distance": "Максимальное расстояние, км",
+            "base_price": "Базовая цена",
+        }
 
 
 class OrderForm(BootstrapFormMixin, forms.ModelForm):
@@ -90,6 +93,21 @@ class OrderForm(BootstrapFormMixin, forms.ModelForm):
             "height_cm",
             "description",
         ]
+        labels = {
+            "pickup_city": "Город забора",
+            "pickup_street": "Улица забора",
+            "pickup_house": "Дом забора",
+            "delivery_to_pickup_point": "Доставка на пункт выдачи",
+            "delivery_city": "Город доставки",
+            "delivery_street": "Улица доставки",
+            "delivery_house": "Дом доставки",
+            "delivery_type": "Тип доставки",
+            "weight_kg": "Вес, кг",
+            "length_cm": "Длина, см",
+            "width_cm": "Ширина, см",
+            "height_cm": "Высота, см",
+            "description": "Комментарий",
+        }
         widgets = {
             "pickup_street": forms.TextInput(attrs={"placeholder": "Улица"}),
             "pickup_house": forms.TextInput(attrs={"placeholder": "Дом"}),
@@ -110,11 +128,12 @@ class DispatcherAssignCourierForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Order
         fields = ["courier"]
+        labels = {"courier": "Курьер"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         user_model = get_user_model()
-        self.fields["courier"].queryset = user_model.objects.filter(role=user_model.ROLE_COURIER)
+        self.fields["courier"].queryset = user_model.objects.filter(role=user_model.ROLE_COURIER).order_by("username")
         self.fields["courier"].required = True
 
 
@@ -139,10 +158,17 @@ class IssueForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Issue
         fields = ["issue_type", "description"]
-        widgets = {"description": forms.Textarea(attrs={"rows": 5, "placeholder": "Опишите ситуацию"})}
+        labels = {
+            "issue_type": "Тип проблемной ситуации",
+            "description": "Описание",
+        }
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 5, "placeholder": "Опишите ситуацию"}),
+        }
 
 
 class IssueResolveForm(BootstrapFormMixin, forms.ModelForm):
     class Meta:
         model = Issue
         fields = ["resolved"]
+        labels = {"resolved": "Проблема решена"}
